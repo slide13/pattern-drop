@@ -1,13 +1,23 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- QR data URLs and user-generated blob URLs are intentionally unoptimized. */
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 
 type Drawing = { id: string; width: number; height: number; createdAt: string };
 type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; drawings?: Drawing[] };
 type ProcessedImage = { blob: Blob; preview: string; width: number; height: number };
+type SlotKey = "head" | "torso" | "legs" | "feet" | "accessory";
+type EquippedItem = { drawingId: string; scale: number; rotation: number };
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
+
+const equipmentSlots: { key: SlotKey; label: string; hint: string }[] = [
+  { key: "head", label: "Голова", hint: "головной убор" },
+  { key: "torso", label: "Корпус", hint: "верх одежды" },
+  { key: "legs", label: "Ноги", hint: "низ одежды" },
+  { key: "feet", label: "Обувь", hint: "обувь" },
+  { key: "accessory", label: "Аксессуар", hint: "дополнение" },
+];
 
 function makeSessionId() {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -109,6 +119,135 @@ async function cutOutPaper(file: File): Promise<ProcessedImage> {
   return { blob, preview: URL.createObjectURL(blob), width: cropped.width, height: cropped.height };
 }
 
+function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: Drawing[] }) {
+  const [avatar, setAvatar] = useState<"boy" | "girl">("girl");
+  const [equipped, setEquipped] = useState<Partial<Record<SlotKey, EquippedItem>>>({});
+  const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
+  const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);
+
+  const drawingUrl = (drawingId: string) => `/api/sessions/${sessionId}/images/${drawingId}`;
+  const selectedItem = equipped[selectedSlot];
+
+  function equip(slot: SlotKey, drawingId: string) {
+    setEquipped(current => ({ ...current, [slot]: { drawingId, scale: 1, rotation: 0 } }));
+    setSelectedSlot(slot);
+    setHeldDrawingId(null);
+  }
+
+  function handleDrop(event: DragEvent<HTMLButtonElement>, slot: SlotKey) {
+    event.preventDefault();
+    const drawingId = event.dataTransfer.getData("text/patterndrop") || heldDrawingId;
+    if (drawingId) equip(slot, drawingId);
+  }
+
+  function updateSelected(patch: Partial<EquippedItem>) {
+    setEquipped(current => {
+      const item = current[selectedSlot];
+      return item ? { ...current, [selectedSlot]: { ...item, ...patch } } : current;
+    });
+  }
+
+  return (
+    <section className="character-screen">
+      <div className="character-titlebar">
+        <div><span>02</span><div><b>МЕНЮ ПЕРСОНАЖА</b><small>Соберите образ из своих рисунков</small></div></div>
+        <div className="avatar-switch" aria-label="Выбор персонажа">
+          <button className={avatar === "boy" ? "active" : ""} onClick={() => setAvatar("boy")}>Мальчик</button>
+          <button className={avatar === "girl" ? "active" : ""} onClick={() => setAvatar("girl")}>Девочка</button>
+        </div>
+      </div>
+
+      <div className="character-layout">
+        <aside className="game-inventory">
+          <div className="game-panel-label"><span>ИНВЕНТАРЬ</span><b>{drawings.length}/24</b></div>
+          <p>Перетащите предмет в ячейку справа. На телефоне: выберите предмет, затем ячейку.</p>
+          <div className="game-items">
+            {drawings.map((drawing, index) => (
+              <button
+                key={drawing.id}
+                draggable
+                className={`game-item ${heldDrawingId === drawing.id ? "held" : ""}`}
+                onClick={() => setHeldDrawingId(current => current === drawing.id ? null : drawing.id)}
+                onDragStart={event => {
+                  event.dataTransfer.setData("text/patterndrop", drawing.id);
+                  event.dataTransfer.effectAllowed = "copy";
+                  setHeldDrawingId(drawing.id);
+                }}
+                aria-pressed={heldDrawingId === drawing.id}
+                aria-label={`Предмет ${index + 1}`}
+              >
+                <img src={drawingUrl(drawing.id)} alt="" />
+                <span>{String(index + 1).padStart(2, "0")}</span>
+              </button>
+            ))}
+            {Array.from({ length: Math.max(0, 12 - drawings.length) }).map((_, index) => <div className="game-item vacant" key={index}>+</div>)}
+          </div>
+          {!drawings.length && <div className="empty-inventory">Сначала добавьте рисунки через вкладку «Передача»</div>}
+        </aside>
+
+        <div className="avatar-board">
+          <div className="avatar-caption"><span>ВИД СПЕРЕДИ</span><span>{avatar === "boy" ? "МОДЕЛЬ 01 / М" : "МОДЕЛЬ 02 / Ж"}</span></div>
+          <div className={`paper-doll ${avatar}`}>
+            <div className="doll-hair" />
+            <div className="doll-head"><i /><i /></div>
+            <div className="doll-neck" />
+            <div className="doll-body" />
+            <div className="doll-arm left" /><div className="doll-arm right" />
+            <div className="doll-leg left" /><div className="doll-leg right" />
+            {equipmentSlots.map(slot => {
+              const item = equipped[slot.key];
+              return item ? (
+                <button
+                  key={slot.key}
+                  className={`worn-item worn-${slot.key} ${selectedSlot === slot.key ? "selected" : ""}`}
+                  style={{ transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})` }}
+                  onClick={() => setSelectedSlot(slot.key)}
+                  aria-label={`Настроить предмет в ячейке ${slot.label}`}
+                ><img src={drawingUrl(item.drawingId)} alt="" /></button>
+              ) : null;
+            })}
+          </div>
+          <div className="avatar-floor" />
+        </div>
+
+        <aside className="equipment-panel">
+          <div className="game-panel-label"><span>ЭКИПИРОВКА</span><b>5 ЯЧЕЕК</b></div>
+          <div className="equipment-slots">
+            {equipmentSlots.map(slot => {
+              const item = equipped[slot.key];
+              return (
+                <button
+                  key={slot.key}
+                  className={`equipment-slot ${selectedSlot === slot.key ? "active" : ""} ${item ? "filled" : ""}`}
+                  onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
+                  onDrop={event => handleDrop(event, slot.key)}
+                  onClick={() => heldDrawingId ? equip(slot.key, heldDrawingId) : setSelectedSlot(slot.key)}
+                >
+                  <span className="slot-icon">{item ? <img src={drawingUrl(item.drawingId)} alt="" /> : "+"}</span>
+                  <span><b>{slot.label}</b><small>{item ? "предмет экипирован" : slot.hint}</small></span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={`item-controls ${selectedItem ? "enabled" : ""}`}>
+            <div className="controls-title"><span>НАСТРОЙКА ПРЕДМЕТА</span><b>{equipmentSlots.find(slot => slot.key === selectedSlot)?.label}</b></div>
+            <label>
+              <span>Масштаб</span><output>{selectedItem ? Math.round(selectedItem.scale * 100) : 100}%</output>
+              <input type="range" min="40" max="220" value={selectedItem ? selectedItem.scale * 100 : 100} disabled={!selectedItem} onChange={event => updateSelected({ scale: Number(event.target.value) / 100 })} />
+            </label>
+            <div className="rotation-control">
+              <span>Поворот</span>
+              <div><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: (selectedItem?.rotation || 0) - 15 })}>↶ −15°</button><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: (selectedItem?.rotation || 0) + 15 })}>+15° ↷</button></div>
+            </div>
+            <button className="remove-item" disabled={!selectedItem} onClick={() => setEquipped(current => ({ ...current, [selectedSlot]: undefined }))}>Снять предмет</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 export default function Studio() {
   const [sessionId, setSessionId] = useState("");
   const [isCamera, setIsCamera] = useState(false);
@@ -119,6 +258,7 @@ export default function Studio() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
+  const [activeView, setActiveView] = useState<"transfer" | "character">("transfer");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -242,9 +382,13 @@ export default function Studio() {
     <main className="desktop-shell">
       <nav className="topbar">
         <div className="brand"><span className="brand-mark">P</span> PatternDrop <b>BETA</b></div>
+        <div className="desktop-nav" aria-label="Разделы приложения">
+          <button className={activeView === "transfer" ? "active" : ""} onClick={() => setActiveView("transfer")}><span>01</span> Передача</button>
+          <button className={activeView === "character" ? "active" : ""} onClick={() => setActiveView("character")}><span>02</span> Персонаж</button>
+        </div>
         <div className="session-code">СЕССИЯ <span>{sessionId.slice(0, 4).toUpperCase()} · {sessionId.slice(4, 8).toUpperCase()}</span></div>
       </nav>
-      <section className="workspace">
+      <section className={`workspace ${activeView !== "transfer" ? "view-hidden" : ""}`}>
         <div className="intro">
           <div className="eyebrow"><span>01</span> ПЕРЕНЕСИТЕ ЭСКИЗ</div>
           <h1>Из бумаги —<br /><em>на экран.</em></h1>
@@ -277,6 +421,7 @@ export default function Studio() {
           </div>}
         </div>
       </section>
+      <div className={activeView !== "character" ? "view-hidden" : ""}><CharacterMenu sessionId={sessionId} drawings={drawings} /></div>
       <footer><span>PATTERNDROP / 2026</span><span>БЕЗ CHATGPT · ФАЙЛЫ УДАЛЯЮТСЯ ЧЕРЕЗ 24 ЧАСА</span></footer>
       {selectedDrawing && (
         <div className="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр рисунка">
