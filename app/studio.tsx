@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 
 type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; width?: number; height?: number };
 type ProcessedImage = { blob: Blob; preview: string; width: number; height: number };
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
 
 function makeSessionId() {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -89,9 +90,11 @@ export default function Studio() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const mobileUrl = useMemo(() => sessionId && typeof window !== "undefined"
-    ? `${window.location.origin}${window.location.pathname}?session=${sessionId}&mode=camera` : "", [sessionId]);
-  const isLoopback = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const mobileUrl = useMemo(() => {
+    if (!sessionId || typeof window === "undefined") return "";
+    const siteUrl = configuredSiteUrl || window.location.origin;
+    return `${siteUrl}${window.location.pathname}?session=${sessionId}&mode=camera`;
+  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId) fetch(`/api/sessions/${sessionId}`, { method: "POST" }).catch(() => undefined);
@@ -190,7 +193,6 @@ export default function Studio() {
           <div className="eyebrow"><span>01</span> ПЕРЕНЕСИТЕ ЭСКИЗ</div>
           <h1>Из бумаги —<br /><em>на экран.</em></h1>
           <p>Сфотографируйте рисунок одежды на телефон. Фон исчезнет, и результат сразу появится здесь.</p>
-          {isLoopback && <div className="lan-warning"><b>Для телефона:</b> откройте эту страницу на компьютере по адресу Network, который показан в терминале. Тогда QR будет доступен в вашей Wi‑Fi‑сети.</div>}
           <div className="promise-list"><span><b>01</b> Без входа</span><span><b>02</b> Автообрезка</span><span><b>03</b> Мгновенно</span></div>
         </div>
         <div className="transfer-panel">
