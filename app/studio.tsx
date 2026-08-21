@@ -1,14 +1,14 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- QR data URLs and user-generated blob URLs are intentionally unoptimized. */
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 
 type Drawing = { id: string; width: number; height: number; createdAt: string };
 type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; drawings?: Drawing[] };
 type ProcessedImage = { blob: Blob; preview: string; width: number; height: number };
 type SlotKey = "head" | "torso" | "legs" | "feet" | "accessory";
-type EquippedItem = { drawingId: string; scale: number; rotation: number };
+type EquippedItem = { drawingId: string; scale: number; rotation: number; x: number; y: number };
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
 
 const equipmentSlots: { key: SlotKey; label: string; hint: string }[] = [
@@ -124,12 +124,13 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
   const [equipped, setEquipped] = useState<Partial<Record<SlotKey, EquippedItem>>>({});
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
   const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);
+  const moveRef = useRef<{ slot: SlotKey; pointerId: number; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
 
   const drawingUrl = (drawingId: string) => `/api/sessions/${sessionId}/images/${drawingId}`;
   const selectedItem = equipped[selectedSlot];
 
   function equip(slot: SlotKey, drawingId: string) {
-    setEquipped(current => ({ ...current, [slot]: { drawingId, scale: 1, rotation: 0 } }));
+    setEquipped(current => ({ ...current, [slot]: { drawingId, scale: 1, rotation: 0, x: 0, y: 0 } }));
     setSelectedSlot(slot);
     setHeldDrawingId(null);
   }
@@ -145,6 +146,31 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
       const item = current[selectedSlot];
       return item ? { ...current, [selectedSlot]: { ...item, ...patch } } : current;
     });
+  }
+
+  function startMoving(event: ReactPointerEvent<HTMLButtonElement>, slot: SlotKey, item: EquippedItem) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedSlot(slot);
+    moveRef.current = { slot, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, itemX: item.x, itemY: item.y };
+  }
+
+  function moveItem(event: ReactPointerEvent<HTMLButtonElement>) {
+    const moving = moveRef.current;
+    if (!moving || moving.pointerId !== event.pointerId) return;
+    const x = moving.itemX + event.clientX - moving.startX;
+    const y = moving.itemY + event.clientY - moving.startY;
+    setEquipped(current => {
+      const item = current[moving.slot];
+      return item ? { ...current, [moving.slot]: { ...item, x, y } } : current;
+    });
+  }
+
+  function finishMoving(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (moveRef.current?.pointerId !== event.pointerId) return;
+    moveRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   return (
@@ -186,7 +212,7 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
         </aside>
 
         <div className="avatar-board">
-          <div className="avatar-caption"><span>ВИД СПЕРЕДИ</span><span>{avatar === "boy" ? "МОДЕЛЬ 01 / М" : "МОДЕЛЬ 02 / Ж"}</span></div>
+          <div className="avatar-caption"><span>ПЕРЕТАСКИВАЙТЕ ПРЕДМЕТЫ</span><span>{avatar === "boy" ? "МОДЕЛЬ 01 / М" : "МОДЕЛЬ 02 / Ж"}</span></div>
           <div className={`paper-doll ${avatar}`}>
             <div className="doll-hair" />
             <div className="doll-head"><i /><i /></div>
@@ -200,8 +226,12 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
                 <button
                   key={slot.key}
                   className={`worn-item worn-${slot.key} ${selectedSlot === slot.key ? "selected" : ""}`}
-                  style={{ transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})` }}
+                  style={{ marginLeft: item.x, marginTop: item.y, transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})` }}
                   onClick={() => setSelectedSlot(slot.key)}
+                  onPointerDown={event => startMoving(event, slot.key, item)}
+                  onPointerMove={moveItem}
+                  onPointerUp={finishMoving}
+                  onPointerCancel={finishMoving}
                   aria-label={`Настроить предмет в ячейке ${slot.label}`}
                 ><img src={drawingUrl(item.drawingId)} alt="" /></button>
               ) : null;
@@ -237,9 +267,11 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
               <input type="range" min="40" max="220" value={selectedItem ? selectedItem.scale * 100 : 100} disabled={!selectedItem} onChange={event => updateSelected({ scale: Number(event.target.value) / 100 })} />
             </label>
             <div className="rotation-control">
-              <span>Поворот</span>
-              <div><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: (selectedItem?.rotation || 0) - 15 })}>↶ −15°</button><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: (selectedItem?.rotation || 0) + 15 })}>+15° ↷</button></div>
+              <div className="control-value"><span>Поворот</span><output>{selectedItem?.rotation || 0}°</output></div>
+              <input className="rotation-slider" type="range" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Number(event.target.value) })} />
+              <div className="degree-buttons"><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.max(-180, (selectedItem?.rotation || 0) - 1) })}>↶ −1°</button><input aria-label="Точный угол поворота" type="number" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Math.max(-180, Math.min(180, Number(event.target.value))) })} /><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.min(180, (selectedItem?.rotation || 0) + 1) })}>+1° ↷</button></div>
             </div>
+            <button className="center-item" disabled={!selectedItem} onClick={() => updateSelected({ x: 0, y: 0 })}>Вернуть в центр ячейки</button>
             <button className="remove-item" disabled={!selectedItem} onClick={() => setEquipped(current => ({ ...current, [selectedSlot]: undefined }))}>Снять предмет</button>
           </div>
         </aside>
