@@ -12,3 +12,14 @@ export const transferSessions = sqliteTable("transfer_sessions", {
 }, table => [
   index("idx_transfer_sessions_updated_at").on(table.updatedAt),
 ]);
+
+export const sessionImages = sqliteTable("session_images", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  objectKey: text("object_key").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => [
+  index("idx_session_images_session_created").on(table.sessionId, table.createdAt),
+]);

@@ -15,6 +15,13 @@
       "when": 1787340420050,
       "tag": "0001_lying_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787341920047,
+      "tag": "0002_silent_thena",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,8 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 
-type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; width?: number; height?: number };
+type Drawing = { id: string; width: number; height: number; createdAt: string };
+type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; drawings?: Drawing[] };
 type ProcessedImage = { blob: Blob; preview: string; width: number; height: number };
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
 
@@ -76,6 +77,7 @@ export default function Studio() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
+  const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -119,6 +121,15 @@ export default function Studio() {
     return () => { active = false; window.clearInterval(timer); };
   }, [sessionId, isCamera]);
 
+  useEffect(() => {
+    if (!selectedDrawing) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedDrawing(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedDrawing]);
+
   async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -141,7 +152,9 @@ export default function Studio() {
         body: processed.blob,
       });
       if (!response.ok) throw new Error("Сервер не принял изображение");
-      setMessage("Рисунок уже на компьютере ✓");
+      URL.revokeObjectURL(processed.preview);
+      setProcessed(null);
+      setMessage("Добавлено в инвентарь. Можно снять следующий ✓");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Не удалось отправить фото"); }
     finally { setBusy(false); }
   }
@@ -181,7 +194,9 @@ export default function Studio() {
     </main>
   );
 
-  const imageUrl = session.status === "uploaded" ? `/api/sessions/${sessionId}/image?v=${encodeURIComponent(session.updatedAt || "1")}` : "";
+  const drawings = session.drawings || [];
+  const emptySlots = Array.from({ length: Math.max(0, 12 - drawings.length) });
+  const drawingUrl = (drawing: Drawing) => `/api/sessions/${sessionId}/images/${drawing.id}`;
   return (
     <main className="desktop-shell">
       <nav className="topbar">
@@ -204,13 +219,34 @@ export default function Studio() {
             </div>
             <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { await navigator.clipboard.writeText(mobileUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>{copied ? "СКОПИРОВАНО ✓" : "КОПИРОВАТЬ ССЫЛКУ"}</button></div>
           </> : <div className="result-panel">
-            <div className="panel-heading"><div><span className="live-dot ready" /> РИСУНОК ПОЛУЧЕН</div><span>{session.width} × {session.height} PX</span></div>
-            <div className="result-stage"><img src={imageUrl} alt="Загруженный рисунок одежды без фона" /><span className="result-label">ФОН УДАЛЁН</span></div>
-            <div className="result-actions"><a href={imageUrl} download={`pattern-${sessionId}.png`} className="primary-button">Скачать PNG ↓</a><button className="secondary-button" onClick={restart}>Новый рисунок</button></div>
+            <div className="panel-heading"><div><span className="live-dot ready" /> ИНВЕНТАРЬ СЕССИИ</div><span>{drawings.length} {drawings.length === 1 ? "ПРЕДМЕТ" : "ПРЕДМЕТОВ"}</span></div>
+            <div className="inventory-wrap">
+              <div className="inventory-hint">Нажмите на рисунок, чтобы рассмотреть</div>
+              <div className="inventory-grid">
+                {drawings.map((drawing, index) => (
+                  <button className="inventory-slot filled" key={drawing.id} onClick={() => setSelectedDrawing(drawing)} aria-label={`Открыть рисунок ${drawings.length - index}`}>
+                    <img src={drawingUrl(drawing)} alt="" loading="lazy" />
+                    <span>{String(drawings.length - index).padStart(2, "0")}</span>
+                  </button>
+                ))}
+                {emptySlots.map((_, index) => <div className="inventory-slot empty" key={`empty-${index}`}><span>+</span></div>)}
+              </div>
+            </div>
+            <div className="result-actions"><span className="inventory-status">Телефон всё ещё подключён — добавляйте ещё</span><button className="secondary-button" onClick={restart}>Новая сессия</button></div>
           </div>}
         </div>
       </section>
       <footer><span>PATTERNDROP / 2026</span><span>БЕЗ CHATGPT · ФАЙЛЫ УДАЛЯЮТСЯ ЧЕРЕЗ 24 ЧАСА</span></footer>
+      {selectedDrawing && (
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр рисунка">
+          <button className="lightbox-dismiss" onClick={() => setSelectedDrawing(null)} aria-label="Закрыть просмотр" />
+          <div className="lightbox-card">
+            <button className="lightbox-close" onClick={() => setSelectedDrawing(null)} aria-label="Закрыть просмотр">×</button>
+            <div className="lightbox-stage"><img src={drawingUrl(selectedDrawing)} alt="Увеличенный рисунок одежды" /></div>
+            <div className="lightbox-meta"><span>{selectedDrawing.width} × {selectedDrawing.height} PX</span><a href={drawingUrl(selectedDrawing)} download={`pattern-${selectedDrawing.id}.png`}>Скачать PNG ↓</a></div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
