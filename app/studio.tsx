@@ -42,14 +42,55 @@ async function cutOutPaper(file: File): Promise<ProcessedImage> {
   }
   red /= samples; green /= samples; blue /= samples;
 
+  // Flood-fill only paper connected to the photo edges. Paper-colored areas
+  // enclosed by drawn contours are never reached and therefore stay opaque.
+  const threshold = 68;
+  const pixelCount = width * height;
+  const state = new Uint8Array(pixelCount); // 0 unknown, 1 queued, 2 not background
+  const queue = new Int32Array(pixelCount);
+  let queueStart = 0;
+  let queueEnd = 0;
+
+  const tryQueue = (pixelIndex: number) => {
+    if (state[pixelIndex] !== 0) return;
+    const i = pixelIndex * 4;
+    const distance = Math.sqrt(
+      (image.data[i] - red) ** 2 +
+      (image.data[i + 1] - green) ** 2 +
+      (image.data[i + 2] - blue) ** 2,
+    );
+    if (distance <= threshold) {
+      state[pixelIndex] = 1;
+      queue[queueEnd++] = pixelIndex;
+    } else {
+      state[pixelIndex] = 2;
+    }
+  };
+
+  for (let x = 0; x < width; x++) {
+    tryQueue(x);
+    tryQueue((height - 1) * width + x);
+  }
+  for (let y = 1; y < height - 1; y++) {
+    tryQueue(y * width);
+    tryQueue(y * width + width - 1);
+  }
+
+  while (queueStart < queueEnd) {
+    const pixelIndex = queue[queueStart++];
+    image.data[pixelIndex * 4 + 3] = 0;
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    if (x > 0) tryQueue(pixelIndex - 1);
+    if (x < width - 1) tryQueue(pixelIndex + 1);
+    if (y > 0) tryQueue(pixelIndex - width);
+    if (y < height - 1) tryQueue(pixelIndex + width);
+  }
+
   let left = width, top = height, right = 0, bottom = 0;
-  const threshold = 46, feather = 24;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      const distance = Math.sqrt((image.data[i] - red) ** 2 + (image.data[i + 1] - green) ** 2 + (image.data[i + 2] - blue) ** 2);
-      if (distance < threshold) image.data[i + 3] = 0;
-      else if (distance < threshold + feather) image.data[i + 3] = Math.round(((distance - threshold) / feather) * 255);
       if (image.data[i + 3] > 28) {
         left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
       }
