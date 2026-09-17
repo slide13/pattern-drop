@@ -19,6 +19,7 @@ test("server-renders the PatternDrop product shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>PatternDrop/);
   assert.match(html, /PatternDrop/);
-  assert.match(html, /Из бумаги/);
+  assert.match(html, /<html\b[^>]*\blang="en"/);
+  assert.match(html, /From paper to screen/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|ChatGPT/i);
 });

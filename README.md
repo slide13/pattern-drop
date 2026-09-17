@@ -1,47 +1,47 @@
 # PatternDrop
 
-Клиент-серверный бойлерплейт для переноса рисунка одежды с бумаги в браузер компьютера.
+A client–server starter for transferring clothing drawings from paper to your computer’s browser.
 
-## Как это работает
+## How it works
 
-1. Компьютер создаёт случайный 16-символьный ID сессии и показывает QR-код.
-2. QR открывает мобильную страницу с тем же ID — аккаунт и авторизация не нужны.
-3. Телефон оценивает цвет бумаги по четырём углам и запускает Canvas-заливку от краёв кадра. Удаляется только внешний связный фон; светлые области внутри замкнутого рисунка сохраняются.
-4. Каждый обработанный PNG сохраняется в R2 отдельным предметом; его сессия и размеры — в D1.
-5. Настольная страница опрашивает API и показывает все рисунки сессии в сетке-инвентаре. Нажатие открывает рисунок в просмотре, ограниченном размерами экрана.
-6. Во вкладке «Персонаж» рисунки можно перетаскивать в RPG-ячейки экипировки и накладывать на модель мальчика или девочки. Надетый предмет свободно двигается мышью или пальцем, масштабируется и поворачивается с точностью до 1°.
+1. The computer generates a random 16-character session ID and displays a QR code.
+2. The QR code opens a mobile page with the same ID—no account or sign-in required.
+3. The phone estimates the paper color from the four corners and uses a Canvas flood fill starting at the image edges. Only the connected outer background is removed; light areas inside closed drawing outlines are preserved.
+4. Each processed PNG is stored in R2 as a separate item; its session and dimensions are stored in D1.
+5. The desktop page polls the API and displays all drawings in the session in an inventory grid. Selecting a drawing opens a preview that fits within the screen.
+6. In the **Character** tab, you can drag drawings into RPG-style equipment slots and overlay them on a boy or girl model. Equipped items can be freely moved with a mouse or finger, scaled, and rotated in 1° increments.
 
-ChatGPT, OpenAI API и сторонние сервисы распознавания в рабочем потоке не используются.
+The workflow does not use ChatGPT, the OpenAI API, or third-party recognition services.
 
-## Локальный запуск
+## Run locally
 
-Требуется Node.js 22.13 или новее.
+Requires Node.js 22.13 or later.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Проект содержит `.nvmrc`, а команды `dev`, `build` и `test` автоматически переключаются на Node.js 22, если nvm установлен.
+The project includes an `.nvmrc` file. The `dev`, `build`, and `test` commands automatically switch to Node.js 22 when nvm is installed.
 
-Адрес, который записывается в QR-код, задаётся в `.env.local`:
+Set the URL encoded in the QR code in `.env.local`:
 
 ```env
 NEXT_PUBLIC_SITE_URL=http://192.168.0.164:3000
 ```
 
-После запуска терминал покажет два адреса: `Local` и `Network`. Откройте **Network URL** на компьютере (например, `http://192.168.1.42:3000`), чтобы именно он попал в QR-код. Телефон и компьютер должны быть в одной Wi‑Fi-сети. Публикация в интернет не нужна.
+After startup, the terminal displays two addresses: `Local` and `Network`. Open the **Network URL** on your computer (for example, `http://192.168.1.42:3000`) to use it in the QR code when no URL is configured in `.env.local`. Your phone and computer must be on the same Wi-Fi network. No internet deployment is needed.
 
-Если macOS спросит разрешение принимать входящие подключения для Node.js, разрешите его. В гостевых Wi‑Fi-сетях связь между устройствами может быть заблокирована настройкой client isolation.
+If macOS asks whether Node.js may accept incoming connections, allow it. On guest Wi-Fi networks, client isolation may block communication between devices.
 
-## Основные части
+## Main components
 
-- `app/studio.tsx` — настольный и мобильный интерфейсы, QR и локальная обработка фото.
-- `worker/index.ts` — API сессий, загрузка и выдача PNG.
-- `db/schema.ts` — схема метаданных D1.
-- `.openai/hosting.json` — объявления D1 и R2 для платформы размещения; это инфраструктурный файл, а не интеграция с OpenAI API.
+- `app/studio.tsx` — desktop and mobile interfaces, QR codes, and on-device photo processing.
+- `worker/index.ts` — session API, PNG uploads, and image delivery.
+- `db/schema.ts` — D1 metadata schema.
+- `.openai/hosting.json` — D1 and R2 declarations for the hosting platform; this is an infrastructure file, not an OpenAI API integration.
 
-## Проверка
+## Verification
 
 ```bash
 npm run build

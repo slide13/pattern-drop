@@ -12,20 +12,20 @@ type EquippedItem = { drawingId: string; scale: number; rotation: number; x: num
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
 
 const equipmentSlots: { key: SlotKey; label: string; hint: string }[] = [
-  { key: "head", label: "Голова", hint: "головной убор" },
-  { key: "torso", label: "Корпус", hint: "верх одежды" },
-  { key: "legs", label: "Ноги", hint: "низ одежды" },
-  { key: "feet", label: "Обувь", hint: "обувь" },
-  { key: "accessory", label: "Аксессуар", hint: "дополнение" },
+  { key: "head", label: "Head", hint: "headwear" },
+  { key: "torso", label: "Torso", hint: "tops" },
+  { key: "legs", label: "Legs", hint: "bottoms" },
+  { key: "feet", label: "Feet", hint: "footwear" },
+  { key: "accessory", label: "Accessory", hint: "extra item" },
 ];
 
 function makeSessionId() {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 }
 
-// Удаление фона работает полностью на устройстве — без AI и внешних API.
+// Background removal runs entirely on the device, without AI or external APIs.
 async function cutOutPaper(file: File): Promise<ProcessedImage> {
-  if (file.size > 12 * 1024 * 1024) throw new Error("Файл больше 12 МБ");
+  if (file.size > 12 * 1024 * 1024) throw new Error("File is larger than 12 MB");
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -34,7 +34,7 @@ async function cutOutPaper(file: File): Promise<ProcessedImage> {
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Не удалось обработать изображение");
+  if (!context) throw new Error("Could not process the image");
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
@@ -115,7 +115,7 @@ async function cutOutPaper(file: File): Promise<ProcessedImage> {
   const cropped = document.createElement("canvas");
   cropped.width = right - left + 1; cropped.height = bottom - top + 1;
   cropped.getContext("2d")?.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
-  const blob = await new Promise<Blob>((resolve, reject) => cropped.toBlob(value => value ? resolve(value) : reject(new Error("Ошибка экспорта")), "image/png"));
+  const blob = await new Promise<Blob>((resolve, reject) => cropped.toBlob(value => value ? resolve(value) : reject(new Error("Export failed")), "image/png"));
   return { blob, preview: URL.createObjectURL(blob), width: cropped.width, height: cropped.height };
 }
 
@@ -176,17 +176,17 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
   return (
     <section className="character-screen">
       <div className="character-titlebar">
-        <div><span>02</span><div><b>МЕНЮ ПЕРСОНАЖА</b><small>Соберите образ из своих рисунков</small></div></div>
-        <div className="avatar-switch" aria-label="Выбор персонажа">
-          <button className={avatar === "boy" ? "active" : ""} onClick={() => setAvatar("boy")}>Мальчик</button>
-          <button className={avatar === "girl" ? "active" : ""} onClick={() => setAvatar("girl")}>Девочка</button>
+        <div><span>02</span><div><b>CHARACTER</b><small>Create an outfit from your drawings</small></div></div>
+        <div className="avatar-switch" aria-label="Choose a character">
+          <button className={avatar === "boy" ? "active" : ""} onClick={() => setAvatar("boy")}>Boy</button>
+          <button className={avatar === "girl" ? "active" : ""} onClick={() => setAvatar("girl")}>Girl</button>
         </div>
       </div>
 
       <div className="character-layout">
         <aside className="game-inventory">
-          <div className="game-panel-label"><span>ИНВЕНТАРЬ</span><b>{drawings.length}/24</b></div>
-          <p>Перетащите предмет в ячейку справа. На телефоне: выберите предмет, затем ячейку.</p>
+          <div className="game-panel-label"><span>INVENTORY</span><b>{drawings.length}/24</b></div>
+          <p>Drag an item into a slot on the right. On your phone, select an item, then a slot.</p>
           <div className="game-items">
             {drawings.map((drawing, index) => (
               <button
@@ -200,7 +200,7 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
                   setHeldDrawingId(drawing.id);
                 }}
                 aria-pressed={heldDrawingId === drawing.id}
-                aria-label={`Предмет ${index + 1}`}
+                aria-label={`Item ${index + 1}`}
               >
                 <img src={drawingUrl(drawing.id)} alt="" />
                 <span>{String(index + 1).padStart(2, "0")}</span>
@@ -208,11 +208,11 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
             ))}
             {Array.from({ length: Math.max(0, 12 - drawings.length) }).map((_, index) => <div className="game-item vacant" key={index}>+</div>)}
           </div>
-          {!drawings.length && <div className="empty-inventory">Сначала добавьте рисунки через вкладку «Передача»</div>}
+          {!drawings.length && <div className="empty-inventory">Add drawings from the Transfer tab first</div>}
         </aside>
 
         <div className="avatar-board">
-          <div className="avatar-caption"><span>ПЕРЕТАСКИВАЙТЕ ПРЕДМЕТЫ</span><span>{avatar === "boy" ? "МОДЕЛЬ 01 / М" : "МОДЕЛЬ 02 / Ж"}</span></div>
+          <div className="avatar-caption"><span>DRAG ITEMS TO POSITION</span><span>{avatar === "boy" ? "MODEL 01 / M" : "MODEL 02 / F"}</span></div>
           <div className={`paper-doll ${avatar}`}>
             <div className="doll-hair" />
             <div className="doll-head"><i /><i /></div>
@@ -232,7 +232,7 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
                   onPointerMove={moveItem}
                   onPointerUp={finishMoving}
                   onPointerCancel={finishMoving}
-                  aria-label={`Настроить предмет в ячейке ${slot.label}`}
+                  aria-label={`Adjust item in the ${slot.label} slot`}
                 ><img src={drawingUrl(item.drawingId)} alt="" /></button>
               ) : null;
             })}
@@ -241,7 +241,7 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
         </div>
 
         <aside className="equipment-panel">
-          <div className="game-panel-label"><span>ЭКИПИРОВКА</span><b>5 ЯЧЕЕК</b></div>
+          <div className="game-panel-label"><span>EQUIPMENT</span><b>5 SLOTS</b></div>
           <div className="equipment-slots">
             {equipmentSlots.map(slot => {
               const item = equipped[slot.key];
@@ -254,25 +254,25 @@ function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: D
                   onClick={() => heldDrawingId ? equip(slot.key, heldDrawingId) : setSelectedSlot(slot.key)}
                 >
                   <span className="slot-icon">{item ? <img src={drawingUrl(item.drawingId)} alt="" /> : "+"}</span>
-                  <span><b>{slot.label}</b><small>{item ? "предмет экипирован" : slot.hint}</small></span>
+                  <span><b>{slot.label}</b><small>{item ? "item equipped" : slot.hint}</small></span>
                 </button>
               );
             })}
           </div>
 
           <div className={`item-controls ${selectedItem ? "enabled" : ""}`}>
-            <div className="controls-title"><span>НАСТРОЙКА ПРЕДМЕТА</span><b>{equipmentSlots.find(slot => slot.key === selectedSlot)?.label}</b></div>
+            <div className="controls-title"><span>ITEM SETTINGS</span><b>{equipmentSlots.find(slot => slot.key === selectedSlot)?.label}</b></div>
             <label>
-              <span>Масштаб</span><output>{selectedItem ? Math.round(selectedItem.scale * 100) : 100}%</output>
+              <span>Scale</span><output>{selectedItem ? Math.round(selectedItem.scale * 100) : 100}%</output>
               <input type="range" min="40" max="220" value={selectedItem ? selectedItem.scale * 100 : 100} disabled={!selectedItem} onChange={event => updateSelected({ scale: Number(event.target.value) / 100 })} />
             </label>
             <div className="rotation-control">
-              <div className="control-value"><span>Поворот</span><output>{selectedItem?.rotation || 0}°</output></div>
+              <div className="control-value"><span>Rotation</span><output>{selectedItem?.rotation || 0}°</output></div>
               <input className="rotation-slider" type="range" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Number(event.target.value) })} />
-              <div className="degree-buttons"><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.max(-180, (selectedItem?.rotation || 0) - 1) })}>↶ −1°</button><input aria-label="Точный угол поворота" type="number" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Math.max(-180, Math.min(180, Number(event.target.value))) })} /><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.min(180, (selectedItem?.rotation || 0) + 1) })}>+1° ↷</button></div>
+              <div className="degree-buttons"><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.max(-180, (selectedItem?.rotation || 0) - 1) })}>↶ −1°</button><input aria-label="Exact rotation angle" type="number" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Math.max(-180, Math.min(180, Number(event.target.value))) })} /><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.min(180, (selectedItem?.rotation || 0) + 1) })}>+1° ↷</button></div>
             </div>
-            <button className="center-item" disabled={!selectedItem} onClick={() => updateSelected({ x: 0, y: 0 })}>Вернуть в центр ячейки</button>
-            <button className="remove-item" disabled={!selectedItem} onClick={() => setEquipped(current => ({ ...current, [selectedSlot]: undefined }))}>Снять предмет</button>
+            <button className="center-item" disabled={!selectedItem} onClick={() => updateSelected({ x: 0, y: 0 })}>Center in slot</button>
+            <button className="remove-item" disabled={!selectedItem} onClick={() => setEquipped(current => ({ ...current, [selectedSlot]: undefined }))}>Unequip item</button>
           </div>
         </aside>
       </div>
@@ -327,7 +327,7 @@ export default function Studio() {
       try {
         const response = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store" });
         if (response.ok && active) setSession(await response.json());
-      } catch { /* следующая проверка повторит запрос */ }
+      } catch { /* Retry on the next poll. */ }
     };
     check();
     const timer = window.setInterval(check, 1500);
@@ -346,29 +346,29 @@ export default function Studio() {
   async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true); setMessage("Отделяем рисунок от фона…");
+    setBusy(true); setMessage("Removing the background…");
     try {
       const result = await cutOutPaper(file);
       if (processed) URL.revokeObjectURL(processed.preview);
-      setProcessed(result); setMessage("Готово. Проверьте результат.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Не удалось обработать фото"); }
+      setProcessed(result); setMessage("Ready. Check the result.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not process the photo"); }
     finally { setBusy(false); event.target.value = ""; }
   }
 
   async function sendPhoto() {
     if (!processed) return;
-    setBusy(true); setMessage("Отправляем на компьютер…");
+    setBusy(true); setMessage("Sending to the computer…");
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: "PUT",
         headers: { "content-type": "image/png", "x-image-width": String(processed.width), "x-image-height": String(processed.height) },
         body: processed.blob,
       });
-      if (!response.ok) throw new Error("Сервер не принял изображение");
+      if (!response.ok) throw new Error("The server rejected the image");
       URL.revokeObjectURL(processed.preview);
       setProcessed(null);
-      setMessage("Добавлено в инвентарь. Можно снять следующий ✓");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Не удалось отправить фото"); }
+      setMessage("Added to inventory. You can photograph the next drawing ✓");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not send the photo"); }
     finally { setBusy(false); }
   }
 
@@ -378,32 +378,32 @@ export default function Studio() {
     window.history.replaceState({}, "", `?session=${id}`);
   }
 
-  if (!sessionId) return <main className="loading">Подготавливаем студию…</main>;
+  if (!sessionId) return <main className="loading">Preparing the studio…</main>;
 
   if (isCamera) return (
     <main className="phone-shell">
       <header className="phone-header">
         <div className="brand"><span className="brand-mark">P</span> PatternDrop</div>
-        <span className="secure-pill"><i /> Сессия найдена</span>
+        <span className="secure-pill"><i /> Session found</span>
       </header>
       <section className="capture-card">
-        <div className="step">ШАГ 1 ИЗ 1</div>
-        <h1>{processed ? "Проверьте вырезку" : "Сфотографируйте рисунок"}</h1>
-        <p>{processed ? "Фон удалён прямо на телефоне. Если всё хорошо — отправляйте." : "Положите лист ровно, оставьте немного воздуха по краям и снимайте сверху."}</p>
+        <div className="step">STEP 1 OF 1</div>
+        <h1>{processed ? "Review the cutout" : "Photograph your drawing"}</h1>
+        <p>{processed ? "The background was removed on your phone. If it looks right, send it." : "Lay the sheet flat, leave some space around the drawing, and photograph it from above."}</p>
         <button className={`camera-stage ${processed ? "has-preview" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}>
-          {processed ? <img src={processed.preview} alt="Рисунок после удаления фона" /> : <>
+          {processed ? <img src={processed.preview} alt="Drawing after background removal" /> : <>
             <span className="focus-corner corner-a" /><span className="focus-corner corner-b" /><span className="focus-corner corner-c" /><span className="focus-corner corner-d" />
-            <span className="camera-icon">●</span><strong>Открыть камеру</strong><small>JPG, PNG · до 12 МБ</small>
+            <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG · up to 12 MB</small>
           </>}
         </button>
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} />
         {message && <div className="mobile-message" role="status"><span>{busy ? "↻" : "✓"}</span>{message}</div>}
         {processed && <div className="mobile-actions">
-          <button className="secondary-button" onClick={() => inputRef.current?.click()} disabled={busy}>Переснять</button>
-          <button className="primary-button" onClick={sendPhoto} disabled={busy}>{busy ? "Отправляем…" : "Отправить →"}</button>
+          <button className="secondary-button" onClick={() => inputRef.current?.click()} disabled={busy}>Retake</button>
+          <button className="primary-button" onClick={sendPhoto} disabled={busy}>{busy ? "Sending…" : "Send →"}</button>
         </div>}
       </section>
-      <p className="privacy-note">Без входа · обработка фото на устройстве</p>
+      <p className="privacy-note">No sign-in · photo processing stays on your device</p>
     </main>
   );
 
@@ -414,34 +414,34 @@ export default function Studio() {
     <main className="desktop-shell">
       <nav className="topbar">
         <div className="brand"><span className="brand-mark">P</span> PatternDrop <b>BETA</b></div>
-        <div className="desktop-nav" aria-label="Разделы приложения">
-          <button className={activeView === "transfer" ? "active" : ""} onClick={() => setActiveView("transfer")}><span>01</span> Передача</button>
-          <button className={activeView === "character" ? "active" : ""} onClick={() => setActiveView("character")}><span>02</span> Персонаж</button>
+        <div className="desktop-nav" aria-label="Application sections">
+          <button className={activeView === "transfer" ? "active" : ""} onClick={() => setActiveView("transfer")}><span>01</span> Transfer</button>
+          <button className={activeView === "character" ? "active" : ""} onClick={() => setActiveView("character")}><span>02</span> Character</button>
         </div>
-        <div className="session-code">СЕССИЯ <span>{sessionId.slice(0, 4).toUpperCase()} · {sessionId.slice(4, 8).toUpperCase()}</span></div>
+        <div className="session-code">SESSION <span>{sessionId.slice(0, 4).toUpperCase()} · {sessionId.slice(4, 8).toUpperCase()}</span></div>
       </nav>
       <section className={`workspace ${activeView !== "transfer" ? "view-hidden" : ""}`}>
         <div className="intro">
-          <div className="eyebrow"><span>01</span> ПЕРЕНЕСИТЕ ЭСКИЗ</div>
-          <h1>Из бумаги —<br /><em>на экран.</em></h1>
-          <p>Сфотографируйте рисунок одежды на телефон. Фон исчезнет, и результат сразу появится здесь.</p>
-          <div className="promise-list"><span><b>01</b> Без входа</span><span><b>02</b> Автообрезка</span><span><b>03</b> Мгновенно</span></div>
+          <div className="eyebrow"><span>01</span> TRANSFER YOUR SKETCH</div>
+          <h1>From paper<br /><em>to screen.</em></h1>
+          <p>Photograph your clothing drawing with your phone. The background disappears, and the result appears here instantly.</p>
+          <div className="promise-list"><span><b>01</b> No sign-in</span><span><b>02</b> Auto-crop</span><span><b>03</b> Instant</span></div>
         </div>
         <div className="transfer-panel">
           {session.status === "waiting" ? <>
-            <div className="panel-heading"><div><span className="live-dot" /> ЖДЁМ ФОТО</div><span>≈ 30 СЕК</span></div>
+            <div className="panel-heading"><div><span className="live-dot" /> WAITING FOR PHOTO</div><span>≈ 30 SEC</span></div>
             <div className="qr-zone">
-              <div className="qr-card">{qr ? <img src={qr} alt="QR-код для открытия камеры на телефоне" /> : <div className="qr-placeholder" />}<span className="scan-line" /></div>
-              <div className="qr-copy"><span className="number">1</span><h2>Наведите камеру телефона на QR-код</h2><p>Откроется страница именно этой сессии — ничего устанавливать и входить не нужно.</p></div>
+              <div className="qr-card">{qr ? <img src={qr} alt="QR code to open the camera page on your phone" /> : <div className="qr-placeholder" />}<span className="scan-line" /></div>
+              <div className="qr-copy"><span className="number">1</span><h2>Point your phone camera at the QR code</h2><p>This session’s page will open—nothing to install and no sign-in required.</p></div>
             </div>
-            <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { await navigator.clipboard.writeText(mobileUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>{copied ? "СКОПИРОВАНО ✓" : "КОПИРОВАТЬ ССЫЛКУ"}</button></div>
+            <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { await navigator.clipboard.writeText(mobileUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>{copied ? "COPIED ✓" : "COPY LINK"}</button></div>
           </> : <div className="result-panel">
-            <div className="panel-heading"><div><span className="live-dot ready" /> ИНВЕНТАРЬ СЕССИИ</div><span>{drawings.length} {drawings.length === 1 ? "ПРЕДМЕТ" : "ПРЕДМЕТОВ"}</span></div>
+            <div className="panel-heading"><div><span className="live-dot ready" /> SESSION INVENTORY</div><span>{drawings.length} {drawings.length === 1 ? "ITEM" : "ITEMS"}</span></div>
             <div className="inventory-wrap">
-              <div className="inventory-hint">Нажмите на рисунок, чтобы рассмотреть</div>
+              <div className="inventory-hint">Select a drawing to view it</div>
               <div className="inventory-grid">
                 {drawings.map((drawing, index) => (
-                  <button className="inventory-slot filled" key={drawing.id} onClick={() => setSelectedDrawing(drawing)} aria-label={`Открыть рисунок ${drawings.length - index}`}>
+                  <button className="inventory-slot filled" key={drawing.id} onClick={() => setSelectedDrawing(drawing)} aria-label={`Open drawing ${drawings.length - index}`}>
                     <img src={drawingUrl(drawing)} alt="" loading="lazy" />
                     <span>{String(drawings.length - index).padStart(2, "0")}</span>
                   </button>
@@ -449,19 +449,19 @@ export default function Studio() {
                 {emptySlots.map((_, index) => <div className="inventory-slot empty" key={`empty-${index}`}><span>+</span></div>)}
               </div>
             </div>
-            <div className="result-actions"><span className="inventory-status">Телефон всё ещё подключён — добавляйте ещё</span><button className="secondary-button" onClick={restart}>Новая сессия</button></div>
+            <div className="result-actions"><span className="inventory-status">Your phone is still connected—add more drawings</span><button className="secondary-button" onClick={restart}>New session</button></div>
           </div>}
         </div>
       </section>
       <div className={activeView !== "character" ? "view-hidden" : ""}><CharacterMenu sessionId={sessionId} drawings={drawings} /></div>
-      <footer><span>PATTERNDROP / 2026</span><span>БЕЗ CHATGPT · ФАЙЛЫ УДАЛЯЮТСЯ ЧЕРЕЗ 24 ЧАСА</span></footer>
+      <footer><span>PATTERNDROP / 2026</span><span>NO CHATGPT · FILES ARE DELETED AFTER 24 HOURS</span></footer>
       {selectedDrawing && (
-        <div className="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр рисунка">
-          <button className="lightbox-dismiss" onClick={() => setSelectedDrawing(null)} aria-label="Закрыть просмотр" />
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label="Drawing preview">
+          <button className="lightbox-dismiss" onClick={() => setSelectedDrawing(null)} aria-label="Close preview" />
           <div className="lightbox-card">
-            <button className="lightbox-close" onClick={() => setSelectedDrawing(null)} aria-label="Закрыть просмотр">×</button>
-            <div className="lightbox-stage"><img src={drawingUrl(selectedDrawing)} alt="Увеличенный рисунок одежды" /></div>
-            <div className="lightbox-meta"><span>{selectedDrawing.width} × {selectedDrawing.height} PX</span><a href={drawingUrl(selectedDrawing)} download={`pattern-${selectedDrawing.id}.png`}>Скачать PNG ↓</a></div>
+            <button className="lightbox-close" onClick={() => setSelectedDrawing(null)} aria-label="Close preview">×</button>
+            <div className="lightbox-stage"><img src={drawingUrl(selectedDrawing)} alt="Enlarged clothing drawing" /></div>
+            <div className="lightbox-meta"><span>{selectedDrawing.width} × {selectedDrawing.height} PX</span><a href={drawingUrl(selectedDrawing)} download={`pattern-${selectedDrawing.id}.png`}>Download PNG ↓</a></div>
           </div>
         </div>
       )}

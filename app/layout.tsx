@@ -12,18 +12,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
   const image = `${protocol}://${host}/og.png`;
   return {
-    title: "PatternDrop — эскиз с бумаги на экран",
-    description: "Сфотографируйте рисунок одежды, удалите фон и мгновенно перенесите его на компьютер.",
+    title: "PatternDrop — sketches from paper to screen",
+    description: "Photograph your clothing drawing, remove the background, and instantly transfer it to your computer.",
     icons: { icon: "/favicon.svg" },
     openGraph: {
       title: "PatternDrop",
-      description: "Из бумаги — на экран.",
-      images: [{ url: image, width: 1200, height: 630, alt: "PatternDrop: из бумаги — на экран" }],
+      description: "From paper to screen.",
+      images: [{ url: image, width: 1200, height: 630, alt: "PatternDrop: from paper to screen" }],
     },
     twitter: { card: "summary_large_image", images: [image] },
   };
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body className={`${manrope.variable} ${mono.variable}`}>{children}</body></html>;
+  return <html lang="en"><body className={`${manrope.variable} ${mono.variable}`}>{children}</body></html>;
 }
