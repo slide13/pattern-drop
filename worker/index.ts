@@ -2,23 +2,12 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
-interface Env {
-  ASSETS: Fetcher;
-  DB: D1Database;
-  UPLOADS: R2Bucket;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
-}
-interface ExecutionContext { waitUntil(promise: Promise<unknown>): void; passThroughOnException(): void; }
+import type { Env, ExecutionContext } from "./types";
+import { MAX_UPLOAD_BYTES, MAX_IMAGE_DIMENSION } from "../shared/constants";
 
 const sessionPattern = /^\/api\/sessions\/([a-f0-9]{16})(?:\/images\/([a-f0-9]{16}))?$/;
 
-async function ensureSchema(db: D1Database) {
+async function ensureSchema(db: Env["DB"]) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS transfer_sessions (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL DEFAULT 'waiting',
@@ -51,11 +40,33 @@ async function handleSession(request: Request, env: Env, id: string, imageId?: s
     if (!row?.object_key) return new Response("Image not found", { status: 404 });
     const object = await env.UPLOADS.get(row.object_key);
     if (!object) return new Response("Image not found", { status: 404 });
-    return new Response(object.body, { headers: {
+    // Worker streams implement the Web Streams API; its generated types differ from lib.dom.
+    return new Response(object.body as unknown as ReadableStream<Uint8Array>, { headers: {
       "content-type": object.httpMetadata?.contentType || "image/png",
       "cache-control": "private, max-age=60",
       "content-disposition": `inline; filename="pattern-${imageId}.png"`,
     } });
+  }
+  if (imageId && request.method === "DELETE") {
+    const row = await env.DB.prepare("SELECT object_key FROM session_images WHERE id = ? AND session_id = ?")
+      .bind(imageId, id).first<{ object_key: string }>();
+    if (!row) return json({ error: "Image not found" }, 404);
+    // Delete storage first: a failed operation leaves metadata available for retry.
+    try {
+      await env.UPLOADS.delete(row.object_key);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM session_images WHERE id = ? AND session_id = ?").bind(imageId, id),
+        env.DB.prepare(`UPDATE transfer_sessions SET
+          status = CASE WHEN EXISTS (SELECT 1 FROM session_images WHERE session_id = ?) THEN 'uploaded' ELSE 'waiting' END,
+          object_key = (SELECT object_key FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT 1),
+          width = (SELECT width FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT 1),
+          height = (SELECT height FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT 1),
+          updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(id, id, id, id, id),
+      ]);
+      return json({ ok: true });
+    } catch {
+      return json({ error: "Could not delete the image" }, 500);
+    }
   }
   if (imageId) return new Response("Method not allowed", { status: 405 });
 
@@ -79,13 +90,39 @@ async function handleSession(request: Request, env: Env, id: string, imageId?: s
   }
   if (request.method === "PUT") {
     const contentType = request.headers.get("content-type") || "";
-    if (!contentType.startsWith("image/")) return json({ error: "Expected an image" }, 415);
-    if (Number(request.headers.get("content-length") || 0) > 12 * 1024 * 1024) return json({ error: "Image is too large" }, 413);
+    if (contentType.split(";")[0].trim().toLowerCase() !== "image/png") return json({ error: "Expected a PNG image" }, 415);
+    if (Number(request.headers.get("content-length") || 0) > MAX_UPLOAD_BYTES) return json({ error: "Image is too large" }, 413);
+    const width = Number(request.headers.get("x-image-width") || 1);
+    const height = Number(request.headers.get("x-image-height") || 1);
+    if (![width, height].every(value => Number.isInteger(value) && value >= 1 && value <= MAX_IMAGE_DIMENSION)) {
+      return json({ error: "Invalid image dimensions" }, 400);
+    }
+    if (!request.body) return json({ error: "Expected an image body" }, 400);
+    // Content-Length may be missing or false. Enforce the limit while reading.
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_UPLOAD_BYTES) {
+          await reader.cancel();
+          return json({ error: "Image is too large" }, 413);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (!size) return json({ error: "Expected an image body" }, 400);
+    const body = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
     const uploadedImageId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
     const objectKey = `transfers/${id}/${uploadedImageId}.png`;
-    await env.UPLOADS.put(objectKey, request.body, { httpMetadata: { contentType: "image/png" } });
-    const width = Math.max(1, Math.min(10000, Number(request.headers.get("x-image-width") || 1)));
-    const height = Math.max(1, Math.min(10000, Number(request.headers.get("x-image-height") || 1)));
+    await env.UPLOADS.put(objectKey, body, { httpMetadata: { contentType: "image/png" } });
     await env.DB.prepare(`INSERT INTO transfer_sessions (id, status, object_key, width, height, updated_at)
       VALUES (?, 'uploaded', ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET status='uploaded', object_key=excluded.object_key,

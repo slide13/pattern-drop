@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { drawWarpCanvas, type WarpPoint } from "./warp-image";
+import { drawWarpCanvas } from "./warp-image";
+import type { WarpPoint } from "./image.types";
+import { MAX_TEXTURE_SIZE } from "./constants";
 
 export default function WarpedItem({ src, points }: { src: string; points: WarpPoint[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,7 +36,7 @@ export default function WarpedItem({ src, points }: { src: string; points: WarpP
     image.onload = () => {
       if (disposed) return;
       const texture = document.createElement("canvas");
-      const ratio = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+      const ratio = Math.min(1, MAX_TEXTURE_SIZE / Math.max(image.naturalWidth, image.naturalHeight));
       texture.width = Math.max(1, Math.round(image.naturalWidth * ratio));
       texture.height = Math.max(1, Math.round(image.naturalHeight * ratio));
       const textureContext = texture.getContext("2d", { willReadFrequently: true });

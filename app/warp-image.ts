@@ -1,17 +1,12 @@
-export type Vec2 = { x: number; y: number };
-export type WarpPoint = Vec2 & { id: string; dx: number; dy: number };
-export type Triangle = { source: [Vec2, Vec2, Vec2]; target: [Vec2, Vec2, Vec2] };
-export type Pixels = { width: number; height: number; data: Uint8ClampedArray };
-export const MAX_WARP_POINTS = 12;
-const divisions = 24;
-const radiusSquared = 0.055;
+import type { Pixels, Triangle, Vec2, WarpPoint } from "./image.types";
+import { MAX_WARP_POINTS, WARP_MESH_DIVISIONS, WARP_INFLUENCE_RADIUS_SQUARED } from "./constants.ts";
 
 function area(a: Vec2, b: Vec2, c: Vec2) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
 function influence(a: Vec2, b: Vec2) {
-  return Math.exp(-((a.x - b.x) ** 2 + (a.y - b.y) ** 2) / radiusSquared);
+  return Math.exp(-((a.x - b.x) ** 2 + (a.y - b.y) ** 2) / WARP_INFLUENCE_RADIUS_SQUARED);
 }
 
 /** Interpolate pin constraints rather than summing displacements. Every pin,
@@ -47,7 +42,7 @@ export function createWarpMesh(points: WarpPoint[]): Triangle[] | null {
   const field = displacementField(points);
   if (!field) return null;
   // Pins are actual mesh vertices, so interpolation/rendering/handles agree.
-  const axis = (values: number[]) => [...new Set([...Array.from({ length: divisions + 1 }, (_, i) => i / divisions), ...values])].sort((a, b) => a - b);
+  const axis = (values: number[]) => [...new Set([...Array.from({ length: WARP_MESH_DIVISIONS + 1 }, (_, i) => i / WARP_MESH_DIVISIONS), ...values])].sort((a, b) => a - b);
   const xs = axis(points.map(p => p.x)), ys = axis(points.map(p => p.y));
   const source = ys.map(y => xs.map(x => ({ x, y })));
   const target = source.map(row => row.map(field));
