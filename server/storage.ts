@@ -1,0 +1,62 @@
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { MIGRATIONS } from "./migrations.ts";
+import type { ImageRow } from "./types";
+
+export function openStorage(directory: string) {
+  const root = resolve(directory);
+  mkdirSync(root, { recursive: true });
+  const db = new DatabaseSync(resolve(root, "patterndrop.sqlite"));
+  try {
+    db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+    const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const [index, migration] of MIGRATIONS.entries()) {
+        if (index < version) continue;
+        db.exec(migration);
+        db.exec(`PRAGMA user_version = ${index + 1}`);
+      }
+      db.exec("COMMIT");
+    } catch (error) { db.exec("ROLLBACK"); throw error; }
+  } catch (error) { db.close(); throw error; }
+
+  function imagePath(key: string) {
+    if (!/^transfers\/[a-f0-9]{16}\/[a-f0-9]{16}\.png$/.test(key)) throw new Error("Invalid image key");
+    return resolve(root, "images", key);
+  }
+
+  return {
+    db,
+    close: () => db.close(),
+    transaction(action: () => void) {
+      db.exec("BEGIN IMMEDIATE");
+      try { action(); db.exec("COMMIT"); }
+      catch (error) { db.exec("ROLLBACK"); throw error; }
+    },
+    image(sessionId: string, imageId: string) {
+      return db.prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?").get(imageId, sessionId) as ImageRow | undefined;
+    },
+    async readImage(key: string) {
+      try { return new Uint8Array(await readFile(imagePath(key))); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+    },
+    async writeImage(key: string, body: Uint8Array) {
+      const path = imagePath(key);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, body, { flag: "wx" });
+    },
+    async deleteImage(key: string) {
+      try { await unlink(imagePath(key)); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    },
+  };
+}
+
+export type Storage = ReturnType<typeof openStorage>;
+const local = globalThis as typeof globalThis & { patternDropStorage?: Storage };
+export function getStorage() {
+  return local.patternDropStorage ??= openStorage(process.env.PATTERNDROP_DATA_DIR || ".data");
+}
