@@ -52,3 +52,7 @@ npm run lint
 npm run typecheck
 npm test
 ```
+
+## Dependency maintenance
+
+`package.json` overrides `@esbuild-kit/core-utils` to use `esbuild` 0.28.2 because Drizzle Kit 0.31.10 still pulls in the vulnerable 0.18.x release through its legacy loader. Keep this override until Drizzle removes or updates that dependency; verify changes with `npm run db:generate` and `npm audit`.
