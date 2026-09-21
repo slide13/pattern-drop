@@ -118,3 +118,30 @@ test("a failed database write after file deletion can be retried", async t => {
   assert.equal((await f.request("DELETE", sessionId, item)).status, 200);
   assert.deepEqual((await (await f.request("GET")).json()).drawings, []);
 });
+
+test("rejects oversized streams without Content-Length before storing anything", async t => {
+  const f = fixture(t);
+  const response = await worker.fetch(new Request(`http://localhost/api/sessions/${sessionId}`, {
+    method: "PUT", headers: { "content-type": "image/png" },
+    body: new Uint8Array(12 * 1024 * 1024 + 1),
+  }), f.env, context);
+  assert.equal(response.status, 413);
+  assert.equal(f.objects.size, 0);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM session_images").get().count, 0);
+});
+
+test("rejects invalid dimensions and unsupported content before storing anything", async t => {
+  const f = fixture(t);
+  for (const [headers, status] of [
+    [{ "content-type": "image/png", "x-image-width": "NaN" }, 400],
+    [{ "content-type": "image/png", "x-image-height": "1.5" }, 400],
+    [{ "content-type": "image/png", "x-image-width": "10001" }, 400],
+    [{ "content-type": "image/jpeg" }, 415],
+  ]) {
+    const response = await worker.fetch(new Request(`http://localhost/api/sessions/${sessionId}`, {
+      method: "PUT", headers, body: new Uint8Array([137, 80, 78, 71]),
+    }), f.env, context);
+    assert.equal(response.status, status);
+  }
+  assert.equal(f.objects.size, 0);
+});

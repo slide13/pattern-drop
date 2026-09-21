@@ -1,283 +1,16 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- QR data URLs and user-generated blob URLs are intentionally unoptimized. */
 
-import { ChangeEvent, DragEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
-
-type Drawing = { id: string; width: number; height: number; createdAt: string };
-type SessionState = { status: "waiting" | "uploaded"; updatedAt?: string; drawings?: Drawing[] };
-type ProcessedImage = { blob: Blob; preview: string; width: number; height: number };
-type SlotKey = "head" | "torso" | "legs" | "feet" | "accessory";
-type EquippedItem = { drawingId: string; scale: number; rotation: number; x: number; y: number };
-const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
-
-const equipmentSlots: { key: SlotKey; label: string; hint: string }[] = [
-  { key: "head", label: "Head", hint: "headwear" },
-  { key: "torso", label: "Torso", hint: "tops" },
-  { key: "legs", label: "Legs", hint: "bottoms" },
-  { key: "feet", label: "Feet", hint: "footwear" },
-  { key: "accessory", label: "Accessory", hint: "extra item" },
-];
+import CharacterMenu from "./character-menu";
+import { cutOutPaper } from "./process-image";
+import type { Drawing, ProcessedImage, SessionState, StudioView } from "./types";
+import { CONFIGURED_SITE_URL, INVENTORY_PLACEHOLDER_COUNT, SESSION_POLL_INTERVAL_MS } from "./constants";
+import { SESSION_ID_PATTERN } from "../shared/constants";
 
 function makeSessionId() {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
-}
-
-// Background removal runs entirely on the device, without AI or external APIs.
-async function cutOutPaper(file: File): Promise<ProcessedImage> {
-  if (file.size > 12 * 1024 * 1024) throw new Error("File is larger than 12 MB");
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Could not process the image");
-  context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
-
-  const image = context.getImageData(0, 0, width, height);
-  const corner = Math.max(4, Math.round(Math.min(width, height) * 0.035));
-  const starts = [[0, 0], [width - corner, 0], [0, height - corner], [width - corner, height - corner]];
-  let red = 0, green = 0, blue = 0, samples = 0;
-  for (const [startX, startY] of starts) {
-    for (let y = startY; y < startY + corner; y += 2) {
-      for (let x = startX; x < startX + corner; x += 2) {
-        const i = (y * width + x) * 4;
-        red += image.data[i]; green += image.data[i + 1]; blue += image.data[i + 2]; samples++;
-      }
-    }
-  }
-  red /= samples; green /= samples; blue /= samples;
-
-  // Flood-fill only paper connected to the photo edges. Paper-colored areas
-  // enclosed by drawn contours are never reached and therefore stay opaque.
-  const threshold = 68;
-  const pixelCount = width * height;
-  const state = new Uint8Array(pixelCount); // 0 unknown, 1 queued, 2 not background
-  const queue = new Int32Array(pixelCount);
-  let queueStart = 0;
-  let queueEnd = 0;
-
-  const tryQueue = (pixelIndex: number) => {
-    if (state[pixelIndex] !== 0) return;
-    const i = pixelIndex * 4;
-    const distance = Math.sqrt(
-      (image.data[i] - red) ** 2 +
-      (image.data[i + 1] - green) ** 2 +
-      (image.data[i + 2] - blue) ** 2,
-    );
-    if (distance <= threshold) {
-      state[pixelIndex] = 1;
-      queue[queueEnd++] = pixelIndex;
-    } else {
-      state[pixelIndex] = 2;
-    }
-  };
-
-  for (let x = 0; x < width; x++) {
-    tryQueue(x);
-    tryQueue((height - 1) * width + x);
-  }
-  for (let y = 1; y < height - 1; y++) {
-    tryQueue(y * width);
-    tryQueue(y * width + width - 1);
-  }
-
-  while (queueStart < queueEnd) {
-    const pixelIndex = queue[queueStart++];
-    image.data[pixelIndex * 4 + 3] = 0;
-    const x = pixelIndex % width;
-    const y = Math.floor(pixelIndex / width);
-    if (x > 0) tryQueue(pixelIndex - 1);
-    if (x < width - 1) tryQueue(pixelIndex + 1);
-    if (y > 0) tryQueue(pixelIndex - width);
-    if (y < height - 1) tryQueue(pixelIndex + width);
-  }
-
-  let left = width, top = height, right = 0, bottom = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      if (image.data[i + 3] > 28) {
-        left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
-      }
-    }
-  }
-  context.putImageData(image, 0, 0);
-  if (left > right || top > bottom) { left = 0; top = 0; right = width - 1; bottom = height - 1; }
-  const padding = Math.round(Math.min(width, height) * 0.025);
-  left = Math.max(0, left - padding); top = Math.max(0, top - padding);
-  right = Math.min(width - 1, right + padding); bottom = Math.min(height - 1, bottom + padding);
-
-  const cropped = document.createElement("canvas");
-  cropped.width = right - left + 1; cropped.height = bottom - top + 1;
-  cropped.getContext("2d")?.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
-  const blob = await new Promise<Blob>((resolve, reject) => cropped.toBlob(value => value ? resolve(value) : reject(new Error("Export failed")), "image/png"));
-  return { blob, preview: URL.createObjectURL(blob), width: cropped.width, height: cropped.height };
-}
-
-function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: Drawing[] }) {
-  const [avatar, setAvatar] = useState<"boy" | "girl">("girl");
-  const [equipped, setEquipped] = useState<Partial<Record<SlotKey, EquippedItem>>>({});
-  const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
-  const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);
-  const moveRef = useRef<{ slot: SlotKey; pointerId: number; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
-
-  const drawingUrl = (drawingId: string) => `/api/sessions/${sessionId}/images/${drawingId}`;
-  const selectedItem = equipped[selectedSlot];
-
-  function equip(slot: SlotKey, drawingId: string) {
-    setEquipped(current => ({ ...current, [slot]: { drawingId, scale: 1, rotation: 0, x: 0, y: 0 } }));
-    setSelectedSlot(slot);
-    setHeldDrawingId(null);
-  }
-
-  function handleDrop(event: DragEvent<HTMLButtonElement>, slot: SlotKey) {
-    event.preventDefault();
-    const drawingId = event.dataTransfer.getData("text/patterndrop") || heldDrawingId;
-    if (drawingId) equip(slot, drawingId);
-  }
-
-  function updateSelected(patch: Partial<EquippedItem>) {
-    setEquipped(current => {
-      const item = current[selectedSlot];
-      return item ? { ...current, [selectedSlot]: { ...item, ...patch } } : current;
-    });
-  }
-
-  function startMoving(event: ReactPointerEvent<HTMLButtonElement>, slot: SlotKey, item: EquippedItem) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setSelectedSlot(slot);
-    moveRef.current = { slot, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, itemX: item.x, itemY: item.y };
-  }
-
-  function moveItem(event: ReactPointerEvent<HTMLButtonElement>) {
-    const moving = moveRef.current;
-    if (!moving || moving.pointerId !== event.pointerId) return;
-    const x = moving.itemX + event.clientX - moving.startX;
-    const y = moving.itemY + event.clientY - moving.startY;
-    setEquipped(current => {
-      const item = current[moving.slot];
-      return item ? { ...current, [moving.slot]: { ...item, x, y } } : current;
-    });
-  }
-
-  function finishMoving(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (moveRef.current?.pointerId !== event.pointerId) return;
-    moveRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  }
-
-  return (
-    <section className="character-screen">
-      <div className="character-titlebar">
-        <div><span>02</span><div><b>CHARACTER</b><small>Create an outfit from your drawings</small></div></div>
-        <div className="avatar-switch" aria-label="Choose a character">
-          <button className={avatar === "boy" ? "active" : ""} onClick={() => setAvatar("boy")}>Boy</button>
-          <button className={avatar === "girl" ? "active" : ""} onClick={() => setAvatar("girl")}>Girl</button>
-        </div>
-      </div>
-
-      <div className="character-layout">
-        <aside className="game-inventory">
-          <div className="game-panel-label"><span>INVENTORY</span><b>{drawings.length}/24</b></div>
-          <p>Drag an item into a slot on the right. On your phone, select an item, then a slot.</p>
-          <div className="game-items">
-            {drawings.map((drawing, index) => (
-              <button
-                key={drawing.id}
-                draggable
-                className={`game-item ${heldDrawingId === drawing.id ? "held" : ""}`}
-                onClick={() => setHeldDrawingId(current => current === drawing.id ? null : drawing.id)}
-                onDragStart={event => {
-                  event.dataTransfer.setData("text/patterndrop", drawing.id);
-                  event.dataTransfer.effectAllowed = "copy";
-                  setHeldDrawingId(drawing.id);
-                }}
-                aria-pressed={heldDrawingId === drawing.id}
-                aria-label={`Item ${index + 1}`}
-              >
-                <img src={drawingUrl(drawing.id)} alt="" />
-                <span>{String(index + 1).padStart(2, "0")}</span>
-              </button>
-            ))}
-            {Array.from({ length: Math.max(0, 12 - drawings.length) }).map((_, index) => <div className="game-item vacant" key={index}>+</div>)}
-          </div>
-          {!drawings.length && <div className="empty-inventory">Add drawings from the Transfer tab first</div>}
-        </aside>
-
-        <div className="avatar-board">
-          <div className="avatar-caption"><span>DRAG ITEMS TO POSITION</span><span>{avatar === "boy" ? "MODEL 01 / M" : "MODEL 02 / F"}</span></div>
-          <div className={`paper-doll ${avatar}`}>
-            <div className="doll-hair" />
-            <div className="doll-head"><i /><i /></div>
-            <div className="doll-neck" />
-            <div className="doll-body" />
-            <div className="doll-arm left" /><div className="doll-arm right" />
-            <div className="doll-leg left" /><div className="doll-leg right" />
-            {equipmentSlots.map(slot => {
-              const item = equipped[slot.key];
-              return item ? (
-                <button
-                  key={slot.key}
-                  className={`worn-item worn-${slot.key} ${selectedSlot === slot.key ? "selected" : ""}`}
-                  style={{ marginLeft: item.x, marginTop: item.y, transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})` }}
-                  onClick={() => setSelectedSlot(slot.key)}
-                  onPointerDown={event => startMoving(event, slot.key, item)}
-                  onPointerMove={moveItem}
-                  onPointerUp={finishMoving}
-                  onPointerCancel={finishMoving}
-                  aria-label={`Adjust item in the ${slot.label} slot`}
-                ><img src={drawingUrl(item.drawingId)} alt="" /></button>
-              ) : null;
-            })}
-          </div>
-          <div className="avatar-floor" />
-        </div>
-
-        <aside className="equipment-panel">
-          <div className="game-panel-label"><span>EQUIPMENT</span><b>5 SLOTS</b></div>
-          <div className="equipment-slots">
-            {equipmentSlots.map(slot => {
-              const item = equipped[slot.key];
-              return (
-                <button
-                  key={slot.key}
-                  className={`equipment-slot ${selectedSlot === slot.key ? "active" : ""} ${item ? "filled" : ""}`}
-                  onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
-                  onDrop={event => handleDrop(event, slot.key)}
-                  onClick={() => heldDrawingId ? equip(slot.key, heldDrawingId) : setSelectedSlot(slot.key)}
-                >
-                  <span className="slot-icon">{item ? <img src={drawingUrl(item.drawingId)} alt="" /> : "+"}</span>
-                  <span><b>{slot.label}</b><small>{item ? "item equipped" : slot.hint}</small></span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={`item-controls ${selectedItem ? "enabled" : ""}`}>
-            <div className="controls-title"><span>ITEM SETTINGS</span><b>{equipmentSlots.find(slot => slot.key === selectedSlot)?.label}</b></div>
-            <label>
-              <span>Scale</span><output>{selectedItem ? Math.round(selectedItem.scale * 100) : 100}%</output>
-              <input type="range" min="40" max="220" value={selectedItem ? selectedItem.scale * 100 : 100} disabled={!selectedItem} onChange={event => updateSelected({ scale: Number(event.target.value) / 100 })} />
-            </label>
-            <div className="rotation-control">
-              <div className="control-value"><span>Rotation</span><output>{selectedItem?.rotation || 0}°</output></div>
-              <input className="rotation-slider" type="range" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Number(event.target.value) })} />
-              <div className="degree-buttons"><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.max(-180, (selectedItem?.rotation || 0) - 1) })}>↶ −1°</button><input aria-label="Exact rotation angle" type="number" min="-180" max="180" step="1" value={selectedItem?.rotation || 0} disabled={!selectedItem} onChange={event => updateSelected({ rotation: Math.max(-180, Math.min(180, Number(event.target.value))) })} /><button disabled={!selectedItem} onClick={() => updateSelected({ rotation: Math.min(180, (selectedItem?.rotation || 0) + 1) })}>+1° ↷</button></div>
-            </div>
-            <button className="center-item" disabled={!selectedItem} onClick={() => updateSelected({ x: 0, y: 0 })}>Center in slot</button>
-            <button className="remove-item" disabled={!selectedItem} onClick={() => setEquipped(current => ({ ...current, [selectedSlot]: undefined }))}>Unequip item</button>
-          </div>
-        </aside>
-      </div>
-    </section>
-  );
 }
 
 export default function Studio() {
@@ -290,24 +23,28 @@ export default function Studio() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
-  const [activeView, setActiveView] = useState<"transfer" | "character">("transfer");
+  const [activeView, setActiveView] = useState<StudioView>("transfer");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
-      const existing = params.get("session");
+      const candidate = params.get("session");
+      const existing = candidate && SESSION_ID_PATTERN.test(candidate) ? candidate : null;
       const id = existing || makeSessionId();
       setSessionId(id);
       setIsCamera(params.get("mode") === "camera");
-      if (!existing) window.history.replaceState({}, "", `?session=${id}`);
+      if (!existing) {
+        params.set("session", id);
+        window.history.replaceState({}, "", `?${params}`);
+      }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
   const mobileUrl = useMemo(() => {
     if (!sessionId || typeof window === "undefined") return "";
-    const siteUrl = configuredSiteUrl || window.location.origin;
+    const siteUrl = CONFIGURED_SITE_URL || window.location.origin;
     return `${siteUrl}${window.location.pathname}?session=${sessionId}&mode=camera`;
   }, [sessionId]);
 
@@ -322,16 +59,22 @@ export default function Studio() {
 
   useEffect(() => {
     if (!sessionId || isCamera) return;
-    let active = true;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
       try {
-        const response = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store" });
-        if (response.ok && active) setSession(await response.json());
+        const response = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store", signal: controller.signal });
+        if (response.ok) {
+          const nextSession: SessionState = await response.json();
+          if (!controller.signal.aborted) setSession(nextSession);
+        }
       } catch { /* Retry on the next poll. */ }
+      finally {
+        if (!controller.signal.aborted) timer = setTimeout(check, SESSION_POLL_INTERVAL_MS);
+      }
     };
-    check();
-    const timer = window.setInterval(check, 1500);
-    return () => { active = false; window.clearInterval(timer); };
+    void check();
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [sessionId, isCamera]);
 
   useEffect(() => {
@@ -343,13 +86,16 @@ export default function Studio() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedDrawing]);
 
+  useEffect(() => {
+    return () => { if (processed) URL.revokeObjectURL(processed.preview); };
+  }, [processed]);
+
   async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setBusy(true); setMessage("Removing the background…");
     try {
       const result = await cutOutPaper(file);
-      if (processed) URL.revokeObjectURL(processed.preview);
       setProcessed(result); setMessage("Ready. Check the result.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not process the photo"); }
     finally { setBusy(false); event.target.value = ""; }
@@ -365,7 +111,6 @@ export default function Studio() {
         body: processed.blob,
       });
       if (!response.ok) throw new Error("The server rejected the image");
-      URL.revokeObjectURL(processed.preview);
       setProcessed(null);
       setMessage("Added to inventory. You can photograph the next drawing ✓");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not send the photo"); }
@@ -374,7 +119,7 @@ export default function Studio() {
 
   function restart() {
     const id = makeSessionId();
-    setSessionId(id); setSession({ status: "waiting" }); setProcessed(null);
+    setSessionId(id); setSession({ status: "waiting" }); setProcessed(null); setSelectedDrawing(null);
     window.history.replaceState({}, "", `?session=${id}`);
   }
 
@@ -408,7 +153,7 @@ export default function Studio() {
   );
 
   const drawings = session.drawings || [];
-  const emptySlots = Array.from({ length: Math.max(0, 12 - drawings.length) });
+  const emptySlots = Array.from({ length: Math.max(0, INVENTORY_PLACEHOLDER_COUNT - drawings.length) });
   const drawingUrl = (drawing: Drawing) => `/api/sessions/${sessionId}/images/${drawing.id}`;
   return (
     <main className="desktop-shell">
@@ -453,8 +198,8 @@ export default function Studio() {
           </div>}
         </div>
       </section>
-      <div className={activeView !== "character" ? "view-hidden" : ""}><CharacterMenu sessionId={sessionId} drawings={drawings} /></div>
-      <footer><span>PATTERNDROP / 2026</span><span>NO CHATGPT · FILES ARE DELETED AFTER 24 HOURS</span></footer>
+      <div className={activeView !== "character" ? "view-hidden" : ""}><CharacterMenu key={sessionId} sessionId={sessionId} drawings={drawings} /></div>
+      <footer><span>PATTERNDROP / 2026</span><span>PHOTO PROCESSING STAYS ON YOUR DEVICE</span></footer>
       {selectedDrawing && (
         <div className="lightbox" role="dialog" aria-modal="true" aria-label="Drawing preview">
           <button className="lightbox-dismiss" onClick={() => setSelectedDrawing(null)} aria-label="Close preview" />

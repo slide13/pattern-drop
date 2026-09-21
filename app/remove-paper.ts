@@ -1,4 +1,5 @@
-type Pixels = { width: number; height: number; data: Uint8ClampedArray };
+import type { Pixels } from "./image.types";
+import { DEFAULT_REMOVAL_STRENGTH } from "./constants.ts";
 
 // A small closing seals 1–2 pixel breaks in pencil outlines before the outside
 // is filled. It does not dilate the final cutout or shrink enclosed white areas.
@@ -25,7 +26,7 @@ function closeOutline(mask: Uint8Array, width: number, height: number) {
 }
 
 /** Remove exterior paper in-place; strength 0–100, higher removes more faint marks. */
-export function removePaper(image: Pixels, strength = 45) {
+export function removePaper(image: Pixels, strength = DEFAULT_REMOVAL_STRENGTH) {
   const { width, height, data } = image;
   if (width < 1 || height < 1 || data.length !== width * height * 4) throw new Error("Invalid image");
   const count = width * height;

@@ -6,12 +6,14 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "bash ./scripts/with-node22.sh vinext dev",
-    "build": "bash ./scripts/with-node22.sh vinext build",
-    "start": "bash ./scripts/with-node22.sh vinext start",
-    "test": "npm run build && bash ./scripts/with-node22.sh node --test tests/rendered-html.test.mjs",
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "start": "vinext start",
+    "test": "npm run build && npm run test:all",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:all": "node --experimental-strip-types --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@eslint/js": "9.39.4",
     "@next/eslint-plugin-next": "16.2.6",
     "@tailwindcss/postcss": "4.2.1",

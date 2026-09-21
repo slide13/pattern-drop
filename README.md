@@ -1,12 +1,12 @@
 # PatternDrop
 
-A client–server starter for transferring clothing drawings from paper to your computer’s browser.
+An app for transferring clothing drawings from paper to your computer’s browser.
 
 ## How it works
 
 1. The computer generates a random 16-character session ID and displays a QR code.
 2. The QR code opens a mobile page with the same ID—no account or sign-in required.
-3. The phone estimates the paper color from the four corners and uses a Canvas flood fill starting at the image edges. Only the connected outer background is removed; light areas inside closed drawing outlines are preserved.
+3. The phone estimates the paper color from local image tiles and uses a Canvas flood fill starting at the image edges. Only the connected outer background is removed; light areas inside closed drawing outlines are preserved.
 4. Each processed PNG is stored in R2 as a separate item; its session and dimensions are stored in D1.
 5. The desktop page polls the API and displays all drawings in the session in an inventory grid. Selecting a drawing opens a preview that fits within the screen.
 6. In the **Character** tab, you can drag drawings into RPG-style equipment slots and overlay them on a boy or girl model. Equipped items can be freely moved with a mouse or finger, scaled, and rotated in 1° increments.
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-The project includes an `.nvmrc` file. The `dev`, `build`, and `test` commands automatically switch to Node.js 22 when nvm is installed.
+The required Node.js version is declared in `package.json` under `engines.node`. npm commands use the Node.js version active in your environment.
 
 Set the URL encoded in the QR code in `.env.local`:
 
@@ -36,7 +36,11 @@ If macOS asks whether Node.js may accept incoming connections, allow it. On gues
 
 ## Main components
 
-- `app/studio.tsx` — desktop and mobile interfaces, QR codes, and on-device photo processing.
+- `app/studio.tsx` — transfer interface and session lifecycle.
+- `app/character-menu.tsx` — character equipment interface.
+- `app/process-image.ts`, `app/remove-paper.ts` — on-device image processing.
+- `app/*.types.ts`, `app/types.ts` — shared domain types.
+- `app/constants.ts`, `shared/constants.ts` — UI settings and API limits.
 - `worker/index.ts` — session API, PNG uploads, and image delivery.
 - `db/schema.ts` — D1 metadata schema.
 - `.openai/hosting.json` — D1 and R2 declarations for the hosting platform; this is an infrastructure file, not an OpenAI API integration.
@@ -44,6 +48,7 @@ If macOS asks whether Node.js may accept incoming connections, allow it. On gues
 ## Verification
 
 ```bash
-npm run build
+npm run lint
+npm run typecheck
 npm test
 ```
