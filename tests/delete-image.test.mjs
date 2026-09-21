@@ -1,56 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DatabaseSync } from "node:sqlite";
-import { default as worker } from "../dist/server/index.js";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { openStorage } from "../server/storage.ts";
+import { handleSessionRequest } from "../server/sessions.ts";
 
 const sessionId = "1111111111111111";
 const otherSessionId = "2222222222222222";
-const context = { waitUntil() {}, passThroughOnException() {} };
 
-// Execute the actual API SQL against isolated SQLite; only the R2 boundary is
-// simulated. Tests never touch the development database or user uploads.
+// Exercise real SQLite and files in an isolated temporary directory.
 function fixture(t) {
-  const sqlite = new DatabaseSync(":memory:");
-  t.after(() => sqlite.close());
-  const objects = new Map();
+  const directory = mkdtempSync(join(tmpdir(), "patterndrop-test-"));
+  const storage = openStorage(directory);
+  t.after(() => { storage.close(); rmSync(directory, { recursive: true, force: true }); });
   const deletedKeys = [];
-  const env = {
-    DB: {
-      prepare(sql) {
-        const statement = sqlite.prepare(sql);
-        let values = [];
-        return {
-          bind(...args) { values = args; return this; },
-          async run() { return statement.run(...values); },
-          async first() { return statement.get(...values) || null; },
-          async all() { return { results: statement.all(...values) }; },
-        };
-      },
-      async batch(statements) {
-        sqlite.exec("BEGIN");
-        try {
-          const result = [];
-          for (const statement of statements) result.push(await statement.run());
-          sqlite.exec("COMMIT");
-          return result;
-        } catch (error) { sqlite.exec("ROLLBACK"); throw error; }
-      },
-    },
-    UPLOADS: {
-      async put(key, body) { objects.set(key, await new Response(body).arrayBuffer()); },
-      async get(key) { return objects.has(key) ? { body: objects.get(key), httpMetadata: { contentType: "image/png" } } : null; },
-      async delete(key) { deletedKeys.push(key); objects.delete(key); },
-    },
-  };
-  const request = (method, session = sessionId, imageId) => worker.fetch(new Request(`http://localhost/api/sessions/${session}${imageId ? `/images/${imageId}` : ""}`, { method }), env, context);
+  const remove = storage.deleteImage;
+  storage.deleteImage = async key => { await remove(key); deletedKeys.push(key); };
+  const objects = { get size() {
+    try { return readdirSync(join(directory, "images"), { recursive: true }).filter(name => name.endsWith(".png")).length; }
+    catch (error) { if (error.code === "ENOENT") return 0; throw error; }
+  } };
+  const request = (method, session = sessionId, imageId) => handleSessionRequest(new Request(`http://localhost/api/sessions/${session}${imageId ? `/images/${imageId}` : ""}`, { method }), storage);
   const upload = async (session = sessionId) => {
-    const response = await worker.fetch(new Request(`http://localhost/api/sessions/${session}`, {
+    const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${session}`, {
       method: "PUT", headers: { "content-type": "image/png", "x-image-width": "10", "x-image-height": "20" }, body: new Uint8Array([137, 80, 78, 71]),
-    }), env, context);
+    }), storage);
     assert.equal(response.status, 200);
     return (await response.json()).imageId;
   };
-  return { sqlite, env, objects, deletedKeys, request, upload };
+  return { sqlite: storage.db, storage, directory, objects, deletedKeys, request, upload };
 }
 
 test("deletes only the selected inventory item, its PNG and no other uploads", async t => {
@@ -98,33 +77,33 @@ test("a different session cannot delete an image; repeated deletion is harmless"
 test("storage failure reports an error and preserves the inventory for retry", async t => {
   const f = fixture(t);
   const item = await f.upload();
-  const remove = f.env.UPLOADS.delete;
-  f.env.UPLOADS.delete = async () => { throw new Error("R2 unavailable"); };
+  const remove = f.storage.deleteImage;
+  f.storage.deleteImage = async () => { throw new Error("Disk unavailable"); };
   assert.equal((await f.request("DELETE", sessionId, item)).status, 500);
   assert.equal((await (await f.request("GET")).json()).drawings.length, 1);
   assert.equal(f.objects.size, 1);
-  f.env.UPLOADS.delete = remove;
+  f.storage.deleteImage = remove;
   assert.equal((await f.request("DELETE", sessionId, item)).status, 200);
 });
 
 test("a failed database write after file deletion can be retried", async t => {
   const f = fixture(t);
   const item = await f.upload();
-  const batch = f.env.DB.batch;
-  f.env.DB.batch = async () => { throw new Error("D1 unavailable"); };
+  const batch = f.storage.transaction;
+  f.storage.transaction = () => { throw new Error("Database unavailable"); };
   assert.equal((await f.request("DELETE", sessionId, item)).status, 500);
   assert.equal((await (await f.request("GET")).json()).drawings.length, 1);
-  f.env.DB.batch = batch;
+  f.storage.transaction = batch;
   assert.equal((await f.request("DELETE", sessionId, item)).status, 200);
   assert.deepEqual((await (await f.request("GET")).json()).drawings, []);
 });
 
 test("rejects oversized streams without Content-Length before storing anything", async t => {
   const f = fixture(t);
-  const response = await worker.fetch(new Request(`http://localhost/api/sessions/${sessionId}`, {
+  const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
     method: "PUT", headers: { "content-type": "image/png" },
     body: new Uint8Array(12 * 1024 * 1024 + 1),
-  }), f.env, context);
+  }), f.storage);
   assert.equal(response.status, 413);
   assert.equal(f.objects.size, 0);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM session_images").get().count, 0);
@@ -138,10 +117,33 @@ test("rejects invalid dimensions and unsupported content before storing anything
     [{ "content-type": "image/png", "x-image-width": "10001" }, 400],
     [{ "content-type": "image/jpeg" }, 415],
   ]) {
-    const response = await worker.fetch(new Request(`http://localhost/api/sessions/${sessionId}`, {
+    const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
       method: "PUT", headers, body: new Uint8Array([137, 80, 78, 71]),
-    }), f.env, context);
+    }), f.storage);
     assert.equal(response.status, status);
   }
   assert.equal(f.objects.size, 0);
+});
+
+test("sessions and PNG bytes survive closing and reopening SQLite", async t => {
+  const f = fixture(t);
+  const image = await f.upload();
+  const reopened = openStorage(f.directory);
+  try {
+    const list = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`), reopened);
+    assert.equal((await list.json()).drawings[0].id, image);
+    const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}/images/${image}`), reopened);
+    assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([137, 80, 78, 71]));
+  } finally { reopened.close(); }
+});
+
+test("a failed upload transaction leaves no partial metadata or image file", async t => {
+  const f = fixture(t);
+  f.sqlite.exec("CREATE TRIGGER fail_image BEFORE INSERT ON session_images BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+  const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
+    method: "PUT", headers: { "content-type": "image/png" }, body: new Uint8Array([137, 80, 78, 71]),
+  }), f.storage);
+  assert.equal(response.status, 500);
+  assert.equal(f.objects.size, 0);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM transfer_sessions").get().count, 0);
 });

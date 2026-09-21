@@ -36,6 +36,8 @@ yarn-error.log*
 .vercel
 
 /dist/
-/.wrangler/
 /outputs/
 /work/
+
+# Local SQLite database and uploaded images
+/.data/

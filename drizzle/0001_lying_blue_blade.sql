@@ -1,1 +1,0 @@
-CREATE INDEX `idx_transfer_sessions_updated_at` ON `transfer_sessions` (`updated_at`);
