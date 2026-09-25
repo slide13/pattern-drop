@@ -31,13 +31,18 @@ export function openStorage(directory: string) {
   return {
     db,
     close: () => db.close(),
-    transaction(action: () => void) {
-      db.exec("BEGIN IMMEDIATE");
-      try { action(); db.exec("COMMIT"); }
-      catch (error) { db.exec("ROLLBACK"); throw error; }
-    },
     image(sessionId: string, imageId: string) {
       return db.prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?").get(imageId, sessionId) as ImageRow | undefined;
+    },
+    images(sessionId: string) {
+      return db.prepare("SELECT * FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC").all(sessionId) as ImageRow[];
+    },
+    insertImage(image: Omit<ImageRow, "created_at">) {
+      db.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
+        .run(image.id, image.session_id, image.object_key, image.width, image.height);
+    },
+    deleteImageRow(sessionId: string, imageId: string) {
+      db.prepare("DELETE FROM session_images WHERE id = ? AND session_id = ?").run(imageId, sessionId);
     },
     async readImage(key: string) {
       try { return new Uint8Array(await readFile(imagePath(key))); }

@@ -18,4 +18,5 @@ export const MIGRATIONS = [
     created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
   );
   CREATE INDEX idx_session_images_session_created ON session_images(session_id, created_at)`,
+  "DROP TABLE transfer_sessions",
 ] as const;

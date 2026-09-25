@@ -45,6 +45,5 @@ export async function cutOutPaper(file: File): Promise<ProcessedImage> {
   if (!croppedContext) throw new Error("Could not crop the image");
   croppedContext.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
   const blob = await new Promise<Blob>((resolve, reject) => cropped.toBlob(value => value ? resolve(value) : reject(new Error("Export failed")), "image/png"));
-  return { blob, preview: URL.createObjectURL(blob), width: cropped.width, height: cropped.height };
+  return { blob, preview: URL.createObjectURL(blob) };
 }
-

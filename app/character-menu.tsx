@@ -1,10 +1,20 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- User-uploaded images are served directly. */
 import { useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import type { Avatar, Drawing, ItemMovement } from "./types";
+import type { Drawing } from "./types";
 import type { Equipment, EquippedItem, SlotKey } from "./equipment.types";
 import { changeEquipment, emptyWardrobe, equipSavedItem } from "./equipment-state";
 import { EQUIPMENT_SLOTS, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
+
+type Avatar = "boy" | "girl";
+type ItemMovement = {
+  slot: SlotKey;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  itemX: number;
+  itemY: number;
+};
 
 export default function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: Drawing[] }) {
   const [avatar, setAvatar] = useState<Avatar>("girl");
@@ -78,7 +88,7 @@ export default function CharacterMenu({ sessionId, drawings }: { sessionId: stri
 
       <div className="character-layout">
         <aside className="game-inventory">
-          <div className="game-panel-label"><span>INVENTORY</span><b>{drawings.length}/24</b></div>
+          <div className="game-panel-label"><span>INVENTORY</span><b>{drawings.length} ITEMS</b></div>
           <p>Drag an item into a slot on the right. On your phone, select an item, then a slot.</p>
           <div className="game-items">
             {drawings.map((drawing, index) => (
@@ -172,4 +182,3 @@ export default function CharacterMenu({ sessionId, drawings }: { sessionId: stri
     </section>
   );
 }
-
