@@ -1,5 +1,6 @@
-import type { Pixels } from "./image.types";
 import { DEFAULT_REMOVAL_STRENGTH } from "./constants.ts";
+
+type Pixels = { width: number; height: number; data: Uint8ClampedArray };
 
 // A small closing seals 1–2 pixel breaks in pencil outlines before the outside
 // is filled. It does not dilate the final cutout or shrink enclosed white areas.

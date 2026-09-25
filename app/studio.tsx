@@ -16,8 +16,8 @@ function makeSessionId() {
 export default function Studio() {
   const [sessionId, setSessionId] = useState("");
   const [isCamera, setIsCamera] = useState(false);
-  const [session, setSession] = useState<SessionState>({ status: "waiting" });
-  const [qr, setQr] = useState("");
+  const [session, setSession] = useState<SessionState>({ drawings: [] });
+  const [qr, setQr] = useState<{ url: string; data: string } | null>(null);
   const [processed, setProcessed] = useState<ProcessedImage | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,12 +49,12 @@ export default function Studio() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (sessionId) fetch(`/api/sessions/${sessionId}`, { method: "POST" }).catch(() => undefined);
-  }, [sessionId]);
-
-  useEffect(() => {
     if (!mobileUrl || isCamera) return;
-    QRCode.toDataURL(mobileUrl, { width: 320, margin: 2, color: { dark: "#101111", light: "#ffffff" } }).then(setQr);
+    let active = true;
+    QRCode.toDataURL(mobileUrl, { width: 320, margin: 2, color: { dark: "#101111", light: "#ffffff" } })
+      .then(data => { if (active) setQr({ url: mobileUrl, data }); })
+      .catch(() => { if (active) setQr(null); });
+    return () => { active = false; };
   }, [mobileUrl, isCamera]);
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function Studio() {
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: "PUT",
-        headers: { "content-type": "image/png", "x-image-width": String(processed.width), "x-image-height": String(processed.height) },
+        headers: { "content-type": "image/png" },
         body: processed.blob,
       });
       if (!response.ok) throw new Error("The server rejected the image");
@@ -119,7 +119,7 @@ export default function Studio() {
 
   function restart() {
     const id = makeSessionId();
-    setSessionId(id); setSession({ status: "waiting" }); setProcessed(null); setSelectedDrawing(null);
+    setSessionId(id); setSession({ drawings: [] }); setProcessed(null); setSelectedDrawing(null);
     window.history.replaceState({}, "", `?session=${id}`);
   }
 
@@ -152,7 +152,7 @@ export default function Studio() {
     </main>
   );
 
-  const drawings = session.drawings || [];
+  const drawings = session.drawings;
   const emptySlots = Array.from({ length: Math.max(0, INVENTORY_PLACEHOLDER_COUNT - drawings.length) });
   const drawingUrl = (drawing: Drawing) => `/api/sessions/${sessionId}/images/${drawing.id}`;
   return (
@@ -173,10 +173,10 @@ export default function Studio() {
           <div className="promise-list"><span><b>01</b> No sign-in</span><span><b>02</b> Auto-crop</span><span><b>03</b> Instant</span></div>
         </div>
         <div className="transfer-panel">
-          {session.status === "waiting" ? <>
+          {!drawings.length ? <>
             <div className="panel-heading"><div><span className="live-dot" /> WAITING FOR PHOTO</div><span>≈ 30 SEC</span></div>
             <div className="qr-zone">
-              <div className="qr-card">{qr ? <img src={qr} alt="QR code to open the camera page on your phone" /> : <div className="qr-placeholder" />}<span className="scan-line" /></div>
+              <div className="qr-card">{qr?.url === mobileUrl ? <img src={qr.data} alt="QR code to open the camera page on your phone" /> : <div className="qr-placeholder" />}<span className="scan-line" /></div>
               <div className="qr-copy"><span className="number">1</span><h2>Point your phone camera at the QR code</h2><p>This session’s page will open—nothing to install and no sign-in required.</p></div>
             </div>
             <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { await navigator.clipboard.writeText(mobileUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>{copied ? "COPIED ✓" : "COPY LINK"}</button></div>

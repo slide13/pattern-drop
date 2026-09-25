@@ -6,4 +6,3 @@ export type ImageRow = {
   height: number;
   created_at: string;
 };
-export type SessionRow = { updated_at: string };

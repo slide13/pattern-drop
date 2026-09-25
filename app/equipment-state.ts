@@ -9,7 +9,6 @@ export function changeEquipment(state: Wardrobe, update: (current: Equipment) =>
   if (equipped === state.equipped) return state;
   const saved = { ...state.saved };
   // Capture outgoing items on removal/replacement as well as the latest edits.
-  // All snapshots are immutable, so points retain their precise coordinates.
   for (const items of [state.equipped, equipped]) {
     for (const [key, item] of Object.entries(items)) {
       if (!item) continue;
@@ -24,7 +23,7 @@ export function equipSavedItem(state: Wardrobe, slot: SlotKey, drawingId: string
   const current = state.equipped[slot];
   if (current?.drawingId === drawingId) return state;
   const item = state.saved[slot]?.[drawingId] ?? {
-    drawingId, scale: 1, scaleX: 1, scaleY: 1, rotation: 0, x: 0, y: 0, warpPoints: [],
+    drawingId, scale: 1, rotation: 0, x: 0, y: 0,
   };
   return changeEquipment(state, current => ({ ...current, [slot]: item }));
 }
