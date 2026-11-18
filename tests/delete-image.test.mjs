@@ -157,3 +157,15 @@ test("a failed upload leaves no partial metadata or image file", async t => {
   assert.equal(f.objects.size, 0);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM session_images").get().count, 0);
 });
+
+test("rejects uploads once a session reaches its image limit, other sessions unaffected", async t => {
+  const f = fixture(t);
+  for (let i = 0; i < 200; i++) await f.upload();
+  const response = await handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
+    method: "PUT", headers: { "content-type": "image/png" }, body: png(),
+  }), f.storage);
+  assert.equal(response.status, 429);
+  assert.match((await response.json()).error, /200 drawings/);
+  assert.equal(f.objects.size, 200);
+  await f.upload(otherSessionId);
+});

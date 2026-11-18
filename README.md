@@ -15,7 +15,7 @@ The workflow does not use ChatGPT, the OpenAI API, or third-party recognition se
 
 ## Run locally
 
-Requires Node.js 22.13 or later.
+Requires Node.js 22.13 or later (`nvm use` picks it up from `.nvmrc`; `.npmrc` sets `engine-strict` so npm refuses older versions).
 
 ```bash
 npm install
