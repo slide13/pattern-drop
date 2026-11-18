@@ -6,11 +6,38 @@ import QRCode from "qrcode";
 import CharacterMenu from "./character-menu";
 import { cutOutPaper } from "./process-image";
 import type { Drawing, ProcessedImage, SessionState, StudioView } from "./types";
-import { CONFIGURED_SITE_URL, INVENTORY_PLACEHOLDER_COUNT, SESSION_POLL_INTERVAL_MS } from "./constants";
+import { CONFIGURED_SITE_URL, INVENTORY_PLACEHOLDER_COUNT, MAX_SOURCE_PHOTO_BYTES, SESSION_POLL_INTERVAL_MS } from "./constants";
+
+const MAX_SOURCE_PHOTO_MB = MAX_SOURCE_PHOTO_BYTES / 1024 / 1024;
 import { SESSION_ID_PATTERN } from "../shared/constants";
 
+// crypto.randomUUID and navigator.clipboard exist only in secure contexts, but the
+// desktop page is often opened over plain HTTP on a LAN address.
 function makeSessionId() {
-  return crypto.randomUUID().replaceAll("-", "").slice(0, 16);
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* Fall back below. */ }
+  }
+  const field = document.createElement("textarea");
+  field.value = text;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.append(field);
+  field.select();
+  try { return document.execCommand("copy"); } catch { return false; } finally { field.remove(); }
+}
+
+async function responseError(response: Response, fallback: string) {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === "object" && "error" in body && typeof body.error === "string") return body.error;
+  } catch { /* Not JSON. */ }
+  return fallback;
 }
 
 export default function Studio() {
@@ -110,7 +137,7 @@ export default function Studio() {
         headers: { "content-type": "image/png" },
         body: processed.blob,
       });
-      if (!response.ok) throw new Error("The server rejected the image");
+      if (!response.ok) throw new Error(await responseError(response, "The server rejected the image"));
       setProcessed(null);
       setMessage("Added to inventory. You can photograph the next drawing ✓");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not send the photo"); }
@@ -138,7 +165,7 @@ export default function Studio() {
         <button className={`camera-stage ${processed ? "has-preview" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}>
           {processed ? <img src={processed.preview} alt="Drawing after background removal" /> : <>
             <span className="focus-corner corner-a" /><span className="focus-corner corner-b" /><span className="focus-corner corner-c" /><span className="focus-corner corner-d" />
-            <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG · up to 12 MB</small>
+            <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG · up to {MAX_SOURCE_PHOTO_MB} MB</small>
           </>}
         </button>
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} />
@@ -179,7 +206,7 @@ export default function Studio() {
               <div className="qr-card">{qr?.url === mobileUrl ? <img src={qr.data} alt="QR code to open the camera page on your phone" /> : <div className="qr-placeholder" />}<span className="scan-line" /></div>
               <div className="qr-copy"><span className="number">1</span><h2>Point your phone camera at the QR code</h2><p>This session’s page will open—nothing to install and no sign-in required.</p></div>
             </div>
-            <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { await navigator.clipboard.writeText(mobileUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>{copied ? "COPIED ✓" : "COPY LINK"}</button></div>
+            <div className="link-row"><span className="link-text">{mobileUrl.replace(/^https?:\/\//, "")}</span><button onClick={async () => { if (await copyText(mobileUrl)) { setCopied(true); window.setTimeout(() => setCopied(false), 1600); } }}>{copied ? "COPIED ✓" : "COPY LINK"}</button></div>
           </> : <div className="result-panel">
             <div className="panel-heading"><div><span className="live-dot ready" /> SESSION INVENTORY</div><span>{drawings.length} {drawings.length === 1 ? "ITEM" : "ITEMS"}</span></div>
             <div className="inventory-wrap">

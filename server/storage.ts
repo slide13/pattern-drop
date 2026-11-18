@@ -37,6 +37,9 @@ export function openStorage(directory: string) {
     images(sessionId: string) {
       return db.prepare("SELECT * FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC").all(sessionId) as ImageRow[];
     },
+    imageCount(sessionId: string) {
+      return (db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?").get(sessionId) as { count: number }).count;
+    },
     insertImage(image: Omit<ImageRow, "created_at">) {
       db.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
         .run(image.id, image.session_id, image.object_key, image.width, image.height);

@@ -1,5 +1,6 @@
 import { readPngUpload, UploadError } from "./png-upload.ts";
 import { getStorage, type Storage } from "./storage.ts";
+import { MAX_IMAGES_PER_SESSION } from "../shared/constants.ts";
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: { "cache-control": "no-store" } });
@@ -36,6 +37,10 @@ async function deleteImage(storage: Storage, sessionId: string, imageId: string)
 }
 
 async function uploadImage(request: Request, storage: Storage, sessionId: string) {
+  // Checked before reading the body so a full session cannot be used to fill the disk.
+  if (storage.imageCount(sessionId) >= MAX_IMAGES_PER_SESSION) {
+    return json({ error: `This session already has ${MAX_IMAGES_PER_SESSION} drawings. Start a new session.` }, 429);
+  }
   const { body, width, height } = await readPngUpload(request);
   const imageId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
   const objectKey = `transfers/${sessionId}/${imageId}.png`;

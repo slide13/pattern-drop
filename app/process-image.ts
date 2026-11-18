@@ -1,11 +1,11 @@
 import type { ProcessedImage } from "./types";
 import { MAX_UPLOAD_BYTES } from "../shared/constants";
-import { MAX_PROCESSED_IMAGE_SIZE } from "./constants";
+import { MAX_PROCESSED_IMAGE_SIZE, MAX_SOURCE_PHOTO_BYTES } from "./constants";
 import { removePaper } from "./remove-paper";
 
 // Background removal runs entirely on the device, without AI or external APIs.
 export async function cutOutPaper(file: File): Promise<ProcessedImage> {
-  if (file.size > MAX_UPLOAD_BYTES) throw new Error("File is larger than 12 MB");
+  if (file.size > MAX_SOURCE_PHOTO_BYTES) throw new Error(`Photo is larger than ${MAX_SOURCE_PHOTO_BYTES / 1024 / 1024} MB`);
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_PROCESSED_IMAGE_SIZE / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -45,5 +45,6 @@ export async function cutOutPaper(file: File): Promise<ProcessedImage> {
   if (!croppedContext) throw new Error("Could not crop the image");
   croppedContext.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
   const blob = await new Promise<Blob>((resolve, reject) => cropped.toBlob(value => value ? resolve(value) : reject(new Error("Export failed")), "image/png"));
+  if (blob.size > MAX_UPLOAD_BYTES) throw new Error("The processed drawing is too large to send");
   return { blob, preview: URL.createObjectURL(blob) };
 }
