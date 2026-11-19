@@ -5,8 +5,8 @@ import type { Drawing } from "./types";
 import type { Equipment, EquippedItem, SlotKey } from "./equipment.types";
 import { changeEquipment, emptyWardrobe, equipSavedItem } from "./equipment-state";
 import { EQUIPMENT_SLOTS, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
+import AvatarFigure, { type Avatar } from "./avatar-figure";
 
-type Avatar = "boy" | "girl";
 type ItemMovement = {
   slot: SlotKey;
   pointerId: number;
@@ -117,12 +117,7 @@ export default function CharacterMenu({ sessionId, drawings }: { sessionId: stri
         <div className="avatar-board">
           <div className="avatar-caption"><span>DRAG ITEMS TO POSITION</span><span>{avatar === "boy" ? "MODEL 01 / M" : "MODEL 02 / F"}</span></div>
           <div className={`paper-doll ${avatar}`}>
-            <div className="doll-hair" />
-            <div className="doll-head"><i /><i /></div>
-            <div className="doll-neck" />
-            <div className="doll-body" />
-            <div className="doll-arm left" /><div className="doll-arm right" />
-            <div className="doll-leg left" /><div className="doll-leg right" />
+            <AvatarFigure avatar={avatar} />
             {EQUIPMENT_SLOTS.map(slot => {
               const item = equipped[slot.key];
               return item ? (
