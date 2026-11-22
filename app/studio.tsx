@@ -52,6 +52,7 @@ export default function Studio() {
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
   const [activeView, setActiveView] = useState<StudioView>("transfer");
   const inputRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -161,17 +162,21 @@ export default function Studio() {
       <section className="capture-card">
         <div className="step">STEP 1 OF 1</div>
         <h1>{processed ? "Review the cutout" : "Photograph your drawing"}</h1>
-        <p>{processed ? "The background was removed on your phone. If it looks right, send it." : "Lay the sheet flat, leave some space around the drawing, and photograph it from above."}</p>
+        <p>{processed ? "The background was removed on your phone. If it looks right, send it." : "Lay the sheet flat, leave some space around the drawing, and photograph it from above—or pick a photo you already took."}</p>
         <button className={`camera-stage ${processed ? "has-preview" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}>
           {processed ? <img src={processed.preview} alt="Drawing after background removal" /> : <>
             <span className="focus-corner corner-a" /><span className="focus-corner corner-b" /><span className="focus-corner corner-c" /><span className="focus-corner corner-d" />
             <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG · up to {MAX_SOURCE_PHOTO_MB} MB</small>
           </>}
         </button>
-        <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} />
+        <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} tabIndex={-1} aria-hidden="true" />
+        {/* Without `capture`, phones offer the photo library and files instead of opening the camera. */}
+        <input ref={galleryRef} className="visually-hidden" type="file" accept="image/*" onChange={choosePhoto} tabIndex={-1} aria-hidden="true" />
+        {!processed && <button className="secondary-button gallery-button" onClick={() => galleryRef.current?.click()} disabled={busy}>Choose from gallery</button>}
         {message && <div className="mobile-message" role="status"><span>{busy ? "↻" : "✓"}</span>{message}</div>}
         {processed && <div className="mobile-actions">
           <button className="secondary-button" onClick={() => inputRef.current?.click()} disabled={busy}>Retake</button>
+          <button className="secondary-button" onClick={() => galleryRef.current?.click()} disabled={busy}>Gallery</button>
           <button className="primary-button" onClick={sendPhoto} disabled={busy}>{busy ? "Sending…" : "Send →"}</button>
         </div>}
       </section>

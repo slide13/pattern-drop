@@ -6,7 +6,10 @@ import { removePaper } from "./remove-paper";
 // Background removal runs entirely on the device, without AI or external APIs.
 export async function cutOutPaper(file: File): Promise<ProcessedImage> {
   if (file.size > MAX_SOURCE_PHOTO_BYTES) throw new Error(`Photo is larger than ${MAX_SOURCE_PHOTO_BYTES / 1024 / 1024} MB`);
-  const bitmap = await createImageBitmap(file);
+  // Gallery picks can be formats the browser cannot decode (e.g. HEIC on Android).
+  const bitmap = await createImageBitmap(file).catch(() => {
+    throw new Error("This image format is not supported. Choose a JPG or PNG photo.");
+  });
   const scale = Math.min(1, MAX_PROCESSED_IMAGE_SIZE / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
