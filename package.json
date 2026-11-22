@@ -17,8 +17,8 @@
   "dependencies": {
     "heic-to": "1.6.7",
     "qrcode": "^1.5.4",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
@@ -29,18 +29,22 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.1",
-    "@vitejs/plugin-rsc": "0.5.35",
+    "@vitejs/plugin-rsc": "0.5.39",
     "eslint": "9.39.4",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
-    "react-server-dom-webpack": "19.3.0",
+    "react-server-dom-webpack": "19.3.1",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.59.3",
-    "vinext": "1.0.0-beta.10",
-    "vite": "8.3.0"
+    "vinext": "1.4.4",
+    "vite": "8.3.6"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "source-map-js": "1.2.2",
+    "fflate": "0.7.5"
+  }
 }
