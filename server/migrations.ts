@@ -19,4 +19,11 @@ export const MIGRATIONS = [
   );
   CREATE INDEX idx_session_images_session_created ON session_images(session_id, created_at)`,
   "DROP TABLE transfer_sessions",
+  // Sessions are registered by the computer that shows the QR code, so a phone can
+  // tell a real session from a mistyped or stale link.
+  `CREATE TABLE sessions (
+    id TEXT PRIMARY KEY NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+  INSERT INTO sessions (id) SELECT DISTINCT session_id FROM session_images`,
 ] as const;

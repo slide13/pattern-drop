@@ -3,11 +3,14 @@ import test from "node:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { MIGRATIONS } from "../server/migrations.ts";
 import { openStorage } from "../server/storage.ts";
 import { handleSessionRequest } from "../server/sessions.ts";
 
 const sessionId = "1111111111111111";
 const otherSessionId = "2222222222222222";
+const unknownSessionId = "3333333333333333";
 
 function png(width = 10, height = 20) {
   const bytes = new Uint8Array(24);
@@ -23,6 +26,8 @@ function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), "patterndrop-test-"));
   const storage = openStorage(directory);
   t.after(() => { storage.close(); rmSync(directory, { recursive: true, force: true }); });
+  storage.createSession(sessionId);
+  storage.createSession(otherSessionId);
   const deletedKeys = [];
   const remove = storage.deleteImage;
   storage.deleteImage = async key => { await remove(key); deletedKeys.push(key); };
@@ -128,11 +133,45 @@ test("validates PNG bytes and reads dimensions from IHDR", async t => {
   assert.deepEqual({ ...f.sqlite.prepare("SELECT width, height FROM session_images WHERE id = ?").get(imageId) }, { width: 10, height: 20 });
 });
 
-test("listing an unknown session is read-only", async t => {
+test("an unknown session is reported as missing and accepts no uploads", async t => {
   const f = fixture(t);
-  assert.deepEqual(await (await f.request("GET")).json(), { drawings: [] });
+  const listing = await f.request("GET", unknownSessionId);
+  assert.equal(listing.status, 404);
+  assert.deepEqual(await listing.json(), { error: "Session not found" });
+  const upload = await handleSessionRequest(new Request(`http://localhost/api/sessions/${unknownSessionId}`, {
+    method: "PUT", headers: { "content-type": "image/png" }, body: png(),
+  }), f.storage);
+  assert.equal(upload.status, 404);
+  assert.equal(f.objects.size, 0);
   assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM session_images").get().count, 0);
-  assert.equal((await f.request("POST")).status, 405);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id = ?").get(unknownSessionId).count, 0);
+});
+
+test("creating a session is idempotent and keeps its drawings", async t => {
+  const f = fixture(t);
+  assert.equal((await f.request("POST", unknownSessionId)).status, 200);
+  assert.deepEqual(await (await f.request("GET", unknownSessionId)).json(), { drawings: [] });
+  const image = await f.upload(unknownSessionId);
+  assert.equal((await f.request("POST", unknownSessionId)).status, 200);
+  assert.deepEqual((await (await f.request("GET", unknownSessionId)).json()).drawings.map(item => item.id), [image]);
+  assert.equal((await f.request("PATCH")).status, 405);
+});
+
+test("upgrading keeps sessions that already have drawings", t => {
+  const directory = mkdtempSync(join(tmpdir(), "patterndrop-test-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  // A database from before sessions were registered: migrations up to session_images only.
+  const legacy = new DatabaseSync(join(directory, "patterndrop.sqlite"));
+  for (const migration of MIGRATIONS.slice(0, 4)) legacy.exec(migration);
+  legacy.exec("PRAGMA user_version = 4");
+  legacy.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
+    .run("aaaaaaaaaaaaaaaa", sessionId, `transfers/${sessionId}/aaaaaaaaaaaaaaaa.png`, 10, 20);
+  legacy.close();
+  const storage = openStorage(directory);
+  try {
+    assert.equal(storage.sessionExists(sessionId), true);
+    assert.equal(storage.sessionExists(otherSessionId), false);
+  } finally { storage.close(); }
 });
 
 test("sessions and PNG bytes survive closing and reopening SQLite", async t => {

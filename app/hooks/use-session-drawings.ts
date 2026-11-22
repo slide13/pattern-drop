@@ -4,7 +4,7 @@ import type { Drawing, SessionState } from "../types";
 
 const NO_DRAWINGS: Drawing[] = [];
 
-/** Polls the server for the drawings uploaded to a session. */
+/** Registers the session on the server, then polls it for uploaded drawings. */
 export function useSessionDrawings(sessionId: string) {
   // Tagged with its session so a restart shows an empty inventory immediately.
   const [state, setState] = useState<{ sessionId: string; drawings: Drawing[] } | null>(null);
@@ -12,12 +12,18 @@ export function useSessionDrawings(sessionId: string) {
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
+    const url = `/api/sessions/${sessionId}`;
+    // Phones only accept sessions the server knows, so it is (re)created if missing.
+    let registered = false;
     const check = async () => {
       try {
-        const response = await fetch(`/api/sessions/${sessionId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        if (!registered) {
+          const created = await fetch(url, { method: "POST", signal: controller.signal });
+          registered = created.ok;
+          if (!registered) return;
+        }
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+        if (response.status === 404) registered = false;
         if (response.ok) {
           const next: SessionState = await response.json();
           if (!controller.signal.aborted) setState({ sessionId, drawings: next.drawings });

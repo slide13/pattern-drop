@@ -31,6 +31,12 @@ export function openStorage(directory: string) {
   return {
     db,
     close: () => db.close(),
+    sessionExists(sessionId: string) {
+      return !!db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(sessionId);
+    },
+    createSession(sessionId: string) {
+      db.prepare("INSERT OR IGNORE INTO sessions (id) VALUES (?)").run(sessionId);
+    },
     image(sessionId: string, imageId: string) {
       return db.prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?").get(imageId, sessionId) as ImageRow | undefined;
     },

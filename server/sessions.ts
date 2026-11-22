@@ -55,6 +55,11 @@ async function uploadImage(request: Request, storage: Storage, sessionId: string
 }
 
 async function handleSession(request: Request, storage: Storage, sessionId: string, imageId?: string) {
+  if (!imageId && request.method === "POST") {
+    storage.createSession(sessionId);
+    return json({ ok: true });
+  }
+  if (!storage.sessionExists(sessionId)) return json({ error: "Session not found" }, 404);
   if (imageId) {
     if (request.method === "GET") return getImage(storage, sessionId, imageId);
     if (request.method === "DELETE") return deleteImage(storage, sessionId, imageId);

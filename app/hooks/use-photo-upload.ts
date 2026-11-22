@@ -22,8 +22,14 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-/** Phone-side flow: cut the drawing out of a photo, then send it to the session. */
-export function usePhotoUpload(sessionId: string) {
+/**
+ * Phone-side flow: cut the drawing out of a photo, then send it to the session.
+ * Does nothing unless `enabled`, so photos are only taken for a session the server knows.
+ */
+export function usePhotoUpload(
+  sessionId: string,
+  { enabled, onSessionMissing }: { enabled: boolean; onSessionMissing: () => void },
+) {
   const [processed, setProcessed] = useState<ProcessedImage | null>(null);
   const [status, setStatus] = useState<UploadStatus>({ phase: "idle", message: "" });
 
@@ -34,6 +40,7 @@ export function usePhotoUpload(sessionId: string) {
   }, [processed]);
 
   async function processPhoto(file: File) {
+    if (!enabled) return;
     const progress = (message: string) => setStatus({ phase: "busy", message });
     progress("Removing the background…");
     try {
@@ -45,7 +52,7 @@ export function usePhotoUpload(sessionId: string) {
   }
 
   async function sendPhoto() {
-    if (!processed) return;
+    if (!processed || !enabled) return;
     setStatus({ phase: "busy", message: "Sending to the computer…" });
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, {
@@ -53,6 +60,12 @@ export function usePhotoUpload(sessionId: string) {
         headers: { "content-type": "image/png" },
         body: processed.blob,
       });
+      if (response.status === 404) {
+        setProcessed(null);
+        setStatus({ phase: "idle", message: "" });
+        onSessionMissing();
+        return;
+      }
       if (!response.ok)
         throw new Error(await responseError(response, "The server rejected the image"));
       setProcessed(null);
