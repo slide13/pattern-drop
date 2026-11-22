@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 test("server-renders the PatternDrop product shell", async () => {
-  const serverUrl = new URL("../dist/server/index.js", import.meta.url);
+  const serverUrl = new URL("../../dist/server/index.js", import.meta.url);
   serverUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: handleRequest } = await import(serverUrl.href);
   const response = await handleRequest(new Request("http://localhost/"));
