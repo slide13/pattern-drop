@@ -1,4 +1,4 @@
-import { DEFAULT_REMOVAL_STRENGTH } from "./constants.ts";
+import { DEFAULT_REMOVAL_STRENGTH } from "./image-constants.ts";
 
 type Pixels = { width: number; height: number; data: Uint8ClampedArray };
 
