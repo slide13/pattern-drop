@@ -124,7 +124,7 @@ export default function Studio() {
     if (!file) return;
     setBusy(true); setFailed(false); setMessage("Removing the background…");
     try {
-      const result = await cutOutPaper(file);
+      const result = await cutOutPaper(file, setMessage);
       setProcessed(result); setMessage("Ready. Check the result.");
     } catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : "Could not process the photo"); }
     finally { setBusy(false); event.target.value = ""; }
@@ -167,7 +167,7 @@ export default function Studio() {
         <button className={`camera-stage ${processed ? "has-preview" : ""}`} onClick={() => inputRef.current?.click()} disabled={busy}>
           {processed ? <img src={processed.preview} alt="Drawing after background removal" /> : <>
             <span className="focus-corner corner-a" /><span className="focus-corner corner-b" /><span className="focus-corner corner-c" /><span className="focus-corner corner-d" />
-            <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG · up to {MAX_SOURCE_PHOTO_MB} MB</small>
+            <span className="camera-icon">●</span><strong>Open camera</strong><small>JPG, PNG, HEIC · up to {MAX_SOURCE_PHOTO_MB} MB</small>
           </>}
         </button>
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" capture="environment" onChange={choosePhoto} tabIndex={-1} aria-hidden="true" />

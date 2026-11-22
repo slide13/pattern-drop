@@ -6,6 +6,7 @@ An app for transferring clothing drawings from paper to your computer’s browse
 
 1. The computer generates a random 16-character session ID and displays a QR code.
 2. The QR code opens a mobile page with the same ID—no account or sign-in required.
+   The phone can take a new photo or pick one from the gallery, including iPhone HEIC photos: browsers without native HEIC support decode them with `heic-to` (libheif/WebAssembly, LGPL-3.0), loaded only when needed.
 3. The phone estimates the paper color from local image tiles and uses a Canvas flood fill starting at the image edges. Only the connected outer background is removed; light areas inside closed drawing outlines are preserved.
 4. Each processed PNG is stored in `.data/images`; its session ID and dimensions are stored in `.data/patterndrop.sqlite`.
 5. The desktop page polls the API and displays all drawings in the session in an inventory grid. Selecting a drawing opens a preview that fits within the screen.
@@ -40,7 +41,7 @@ If macOS asks whether Node.js may accept incoming connections, allow it. On gues
 
 - `app/studio.tsx` — transfer interface and session lifecycle.
 - `app/character-menu.tsx` — character equipment interface.
-- `app/process-image.ts`, `app/remove-paper.ts` — on-device image processing.
+- `app/process-image.ts`, `app/remove-paper.ts`, `app/heic.ts` — on-device image decoding (with HEIC fallback) and processing.
 - `app/equipment.types.ts`, `app/types.ts` — shared domain types.
 - `app/constants.ts`, `shared/constants.ts` — UI settings and API limits.
 - `app/api/sessions/[...path]/route.ts` — session API entry point.

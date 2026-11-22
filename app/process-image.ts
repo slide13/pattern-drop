@@ -2,14 +2,34 @@ import type { ProcessedImage } from "./types";
 import { MAX_UPLOAD_BYTES } from "../shared/constants";
 import { MAX_PROCESSED_IMAGE_SIZE, MAX_SOURCE_PHOTO_BYTES } from "./constants";
 import { removePaper } from "./remove-paper";
+import { isHeifFile } from "./heic";
+
+const UNSUPPORTED = "This image format is not supported. Choose a JPG, PNG or HEIC photo.";
+
+// Safari decodes HEIC natively; other browsers (Chrome/Android, desktop) do not,
+// so HEIC falls back to libheif compiled to WebAssembly. It is loaded on demand
+// because it is ~3 MB and most photos never need it.
+async function decodePhoto(file: File, onStatus?: (message: string) => void) {
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    if (!(await isHeifFile(file))) throw new Error(UNSUPPORTED);
+  }
+  onStatus?.("Converting the HEIC photo…");
+  try {
+    const { heicTo } = await import("heic-to");
+    return await heicTo({ blob: file, type: "bitmap" });
+  } catch (error) {
+    console.error("HEIC decoding failed:", error);
+    throw new Error("Could not read this HEIC photo. Try another photo or take a new one with the camera.");
+  }
+}
 
 // Background removal runs entirely on the device, without AI or external APIs.
-export async function cutOutPaper(file: File): Promise<ProcessedImage> {
+export async function cutOutPaper(file: File, onStatus?: (message: string) => void): Promise<ProcessedImage> {
   if (file.size > MAX_SOURCE_PHOTO_BYTES) throw new Error(`Photo is larger than ${MAX_SOURCE_PHOTO_BYTES / 1024 / 1024} MB`);
-  // Gallery picks can be formats the browser cannot decode (e.g. HEIC on Android).
-  const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("This image format is not supported. Choose a JPG or PNG photo.");
-  });
+  const bitmap = await decodePhoto(file, onStatus);
+  onStatus?.("Removing the background…");
   const scale = Math.min(1, MAX_PROCESSED_IMAGE_SIZE / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
