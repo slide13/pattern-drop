@@ -26,4 +26,11 @@ export const MIGRATIONS = [
     created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
   );
   INSERT INTO sessions (id) SELECT DISTINCT session_id FROM session_images`,
+  // Unused sessions expire; existing ones count as last seen at their latest upload.
+  `ALTER TABLE sessions ADD COLUMN last_seen_at TEXT;
+  UPDATE sessions SET last_seen_at = COALESCE(
+    (SELECT MAX(created_at) FROM session_images WHERE session_id = sessions.id),
+    created_at
+  );
+  CREATE INDEX idx_sessions_last_seen ON sessions(last_seen_at)`,
 ] as const;

@@ -69,6 +69,7 @@ async function handleSession(request: Request, storage: Storage, sessionId: stri
     return json({ ok: true });
   }
   if (!storage.sessionExists(sessionId)) return json({ error: "Session not found" }, 404);
+  storage.touchSession(sessionId);
   if (imageId) {
     if (request.method === "GET") return getImage(storage, sessionId, imageId);
     if (request.method === "DELETE") return deleteImage(storage, sessionId, imageId);

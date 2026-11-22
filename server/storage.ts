@@ -1,8 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { MIGRATIONS } from "./migrations.ts";
+import { startSessionCleanup } from "./cleanup.ts";
 import type { ImageRow } from "./types";
 
 export function openStorage(directory: string) {
@@ -23,6 +24,11 @@ export function openStorage(directory: string) {
     } catch (error) { db.exec("ROLLBACK"); throw error; }
   } catch (error) { db.close(); throw error; }
 
+  function sessionDirectory(sessionId: string) {
+    if (!/^[a-f0-9]{16}$/.test(sessionId)) throw new Error("Invalid session id");
+    return resolve(root, "images", "transfers", sessionId);
+  }
+
   function imagePath(key: string) {
     if (!/^transfers\/[a-f0-9]{16}\/[a-f0-9]{16}\.png$/.test(key)) throw new Error("Invalid image key");
     return resolve(root, "images", key);
@@ -34,8 +40,33 @@ export function openStorage(directory: string) {
     sessionExists(sessionId: string) {
       return !!db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(sessionId);
     },
+    /** Creates the session, or marks an existing one as just used. */
     createSession(sessionId: string) {
-      db.prepare("INSERT OR IGNORE INTO sessions (id) VALUES (?)").run(sessionId);
+      db.prepare(`INSERT INTO sessions (id, last_seen_at) VALUES (?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP`).run(sessionId);
+    },
+    /** Marks a session as used. Coarse (hourly) so frequent polling does not write every time. */
+    touchSession(sessionId: string) {
+      db.prepare(`UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour'))`).run(sessionId);
+    },
+    /** Sessions not used for `days` days. */
+    expiredSessions(days: number) {
+      const rows = db.prepare("SELECT id FROM sessions WHERE last_seen_at < datetime('now', ?)")
+        .all(`-${days} days`) as { id: string }[];
+      return rows.map(row => row.id);
+    },
+    /** Deletes a session, its image rows and every file stored for it. */
+    async removeSession(sessionId: string) {
+      const directory = sessionDirectory(sessionId);
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM session_images WHERE session_id = ?").run(sessionId);
+        db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+        db.exec("COMMIT");
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
+      // Rows go first: once they are gone the files are unreachable, so a failure here only leaves garbage.
+      await rm(directory, { recursive: true, force: true });
     },
     image(sessionId: string, imageId: string) {
       return db.prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?").get(imageId, sessionId) as ImageRow | undefined;
@@ -82,5 +113,9 @@ export function openStorage(directory: string) {
 export type Storage = ReturnType<typeof openStorage>;
 const local = globalThis as typeof globalThis & { patternDropStorage?: Storage };
 export function getStorage() {
-  return local.patternDropStorage ??= openStorage(process.env.PATTERNDROP_DATA_DIR || ".data");
+  if (!local.patternDropStorage) {
+    local.patternDropStorage = openStorage(process.env.PATTERNDROP_DATA_DIR || ".data");
+    startSessionCleanup(local.patternDropStorage);
+  }
+  return local.patternDropStorage;
 }

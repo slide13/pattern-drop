@@ -1,10 +1,11 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- User-uploaded images are served directly. */
-import { useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { Drawing } from "./types";
 import type { Equipment, EquippedItem, SlotKey } from "./equipment.types";
 import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "./equipment-state";
-import { usePersistentState } from "./hooks/use-persistent-state";
+import { removeStaleEntries, usePersistentState } from "./hooks/use-persistent-state";
+import { SESSION_TTL_DAYS } from "../shared/constants";
 import { EQUIPMENT_SLOTS, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
 import AvatarFigure, { type Avatar } from "./avatar-figure";
 import WarpedImage from "./warped-image";
@@ -26,6 +27,9 @@ type ItemMovement = {
 };
 
 // `grab` keeps the handle from jumping when it is pressed off-center.
+const WARDROBE_KEY_PREFIX = "patterndrop:wardrobe:";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const isAvatar = (value: unknown): value is Avatar => value === "boy" || value === "girl";
 
 type PointDrag = { slot: SlotKey; pointId: string; pointerId: number; grab: Vec };
@@ -49,8 +53,15 @@ function newPointId() {
 export default function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: Drawing[] }) {
   const [avatar, setAvatar] = usePersistentState<Avatar>("patterndrop:avatar", () => "girl", isAvatar);
   // Outfits belong to a session: its drawings are what the items point to.
-  const [wardrobe, setWardrobe] = usePersistentState(`patterndrop:wardrobe:${sessionId}`, emptyWardrobe, isWardrobe);
-  const equipped = wardrobe.equipped;
+  const [wardrobe, setWardrobe] = usePersistentState(`${WARDROBE_KEY_PREFIX}${sessionId}`, emptyWardrobe, isWardrobe);
+  // Drawings of an expired session are gone from the server; their items are not shown.
+  const available = new Set(drawings.map(drawing => drawing.id));
+  const equipped: Equipment = Object.fromEntries(
+    Object.entries(wardrobe.equipped).filter(([, item]) => item && available.has(item.drawingId)),
+  );
+
+  // Outfits of sessions the server has already expired are of no further use.
+  useEffect(() => removeStaleEntries(WARDROBE_KEY_PREFIX, SESSION_TTL_DAYS * DAY_MS), []);
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
   const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);
   const moveRef = useRef<ItemMovement | null>(null);
