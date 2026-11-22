@@ -1,3 +1,5 @@
+import type { WarpPoint } from "./warp";
+
 export type SlotKey = "head" | "torso" | "legs" | "feet" | "accessory";
 export type EquippedItem = {
   drawingId: string;
@@ -5,6 +7,8 @@ export type EquippedItem = {
   rotation: number;
   x: number;
   y: number;
+  /** Control points that reshape the image to fit the avatar. */
+  warp?: WarpPoint[];
 };
 export type Equipment = Partial<Record<SlotKey, EquippedItem>>;
 export type Wardrobe = {
