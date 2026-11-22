@@ -1,8 +1,8 @@
 "use client";
 
-import DesktopStudio from "./desktop-studio";
-import PhoneCapture from "./phone-capture";
-import { useStudioSession } from "./hooks/use-studio-session";
+import DesktopStudio from "../transfer/desktop-studio";
+import PhoneCapture from "../capture/phone-capture";
+import { useStudioSession } from "../session/use-studio-session";
 
 export default function Studio() {
   const { sessionId, isCamera, restart } = useStudioSession();

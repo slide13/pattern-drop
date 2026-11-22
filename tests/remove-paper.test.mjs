@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { removePaper } from "../app/remove-paper.ts";
+import { removePaper } from "../features/image-processing/remove-paper.ts";
 
 function picture(width, height, pixel = () => [245, 245, 245, 255]) {
   const data = new Uint8ClampedArray(width * height * 4);

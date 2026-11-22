@@ -2,7 +2,7 @@
 // the photo down, remove the paper, crop to the drawing and export a PNG. It only
 // needs a 2D canvas, so it runs on OffscreenCanvas in a worker and on a regular
 // <canvas> elsewhere.
-import { MAX_PROCESSED_IMAGE_SIZE } from "./image-constants.ts";
+import { MAX_PROCESSED_IMAGE_SIZE } from "./constants.ts";
 import { removePaper } from "./remove-paper.ts";
 
 type Pixels = { width: number; height: number; data: Uint8ClampedArray };

@@ -1,4 +1,4 @@
-import type { WarpPoint } from "./warp";
+import type { WarpPoint } from "./warp/warp";
 
 export type SlotKey = "head" | "torso" | "legs" | "feet" | "accessory";
 export type EquippedItem = {

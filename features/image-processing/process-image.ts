@@ -1,9 +1,11 @@
-import type { ProcessedImage } from "./types";
-import { MAX_UPLOAD_BYTES } from "../shared/constants";
-import { MAX_SOURCE_PHOTO_BYTES } from "./image-constants";
+import { MAX_UPLOAD_BYTES } from "../../shared/constants";
+import { MAX_SOURCE_PHOTO_BYTES } from "./constants";
 import { cutOutBitmap } from "./cutout";
 import type { CutoutRequest, CutoutResponse } from "./cutout.worker";
 import { isHeifFile } from "./heic";
+
+/** A cut-out drawing ready to send, with an object URL for previewing it. */
+export type ProcessedImage = { blob: Blob; preview: string };
 
 const UNSUPPORTED = "This image format is not supported. Choose a JPG, PNG or HEIC photo.";
 

@@ -7,7 +7,7 @@ import {
   moveWarpPoint,
   triangleTransform,
   warpPointPosition,
-} from "../app/warp.ts";
+} from "../features/character/warp/warp.ts";
 
 const radius = 80;
 const close = (actual, expected, tolerance = 1e-6) =>

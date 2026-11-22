@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- The preview is a user-generated blob URL. */
 import { type ChangeEvent, useRef } from "react";
-import { MAX_SOURCE_PHOTO_BYTES } from "./image-constants";
-import { usePhotoUpload } from "./hooks/use-photo-upload";
-import { useSessionStatus, type SessionStatus } from "./hooks/use-session-status";
+import { MAX_SOURCE_PHOTO_BYTES } from "../image-processing/constants";
+import { usePhotoUpload } from "./use-photo-upload";
+import { useSessionStatus, type SessionStatus } from "../session/use-session-status";
 
 const MAX_SOURCE_PHOTO_MB = MAX_SOURCE_PHOTO_BYTES / 1024 / 1024;
 

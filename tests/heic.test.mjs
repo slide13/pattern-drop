@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isHeifFile, isHeifHeader } from "../app/heic.ts";
+import { isHeifFile, isHeifHeader } from "../features/image-processing/heic.ts";
 
 function ftyp(major, compatible = []) {
   const brands = [major, "\0\0\0\0", ...compatible].join("");

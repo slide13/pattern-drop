@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cropBounds, scaledSize } from "../app/cutout.ts";
+import { cropBounds, scaledSize } from "../features/image-processing/cutout.ts";
 
 function image(width, height, opaque) {
   const data = new Uint8ClampedArray(width * height * 4);

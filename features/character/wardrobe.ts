@@ -1,5 +1,5 @@
-import type { Equipment, EquippedItem, SlotKey, Wardrobe } from "./equipment.types";
-import type { WarpPoint } from "./warp";
+import type { Equipment, EquippedItem, SlotKey, Wardrobe } from "./wardrobe.types";
+import type { WarpPoint } from "./warp/warp";
 
 export function emptyWardrobe(): Wardrobe {
   return { equipped: {}, saved: {} };

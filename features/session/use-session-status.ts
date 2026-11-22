@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { SESSION_POLL_INTERVAL_MS } from "../constants";
+import { SESSION_POLL_INTERVAL_MS } from "./constants";
 
 export type SessionStatus = "checking" | "found" | "missing";
 

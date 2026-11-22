@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { cutOutPaper } from "../process-image";
-import type { ProcessedImage } from "../types";
+import { cutOutPaper } from "../image-processing/process-image";
+import type { ProcessedImage } from "../image-processing/process-image";
 
 export type UploadStatus = {
   phase: "idle" | "busy" | "done" | "error";

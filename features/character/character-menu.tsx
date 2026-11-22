@@ -1,15 +1,16 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- User-uploaded images are served directly. */
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
-import type { Drawing } from "./types";
-import type { Equipment, EquippedItem, SlotKey } from "./equipment.types";
-import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "./equipment-state";
-import { removeStaleEntries, usePersistentState } from "./hooks/use-persistent-state";
-import { SESSION_TTL_DAYS } from "../shared/constants";
-import { EQUIPMENT_SLOTS, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
+import type { Drawing } from "../../shared/types";
+import type { Equipment, EquippedItem, SlotKey } from "./wardrobe.types";
+import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "./wardrobe";
+import { removeStaleEntries, usePersistentState } from "../../lib/hooks/use-persistent-state";
+import { SESSION_TTL_DAYS } from "../../shared/constants";
+import { EQUIPMENT_SLOTS } from "./constants";
+import { INVENTORY_PLACEHOLDER_COUNT } from "../../shared/constants";
 import AvatarFigure, { type Avatar } from "./avatar-figure";
-import WarpedImage from "./warped-image";
-import { addWarpPoint, moveWarpPoint, warpPointPosition, WARP_RADIUS, type Vec, type WarpPoint } from "./warp";
+import WarpedImage from "./warp/warped-image";
+import { addWarpPoint, moveWarpPoint, warpPointPosition, WARP_RADIUS, type Vec, type WarpPoint } from "./warp/warp";
 
 /** Pointer travel, in pixels, below which a press on an item counts as a click. */
 const CLICK_SLOP = 4;

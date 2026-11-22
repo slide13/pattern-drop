@@ -1,12 +1,15 @@
 /* eslint-disable @next/next/no-img-element -- QR data URLs and session images are intentionally unoptimized. */
 import { useCallback, useMemo, useState } from "react";
-import CharacterMenu from "./character-menu";
+import CharacterMenu from "../character/character-menu";
 import DrawingLightbox from "./drawing-lightbox";
-import { CONFIGURED_SITE_URL, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
-import { useCopyToClipboard } from "./hooks/use-copy-to-clipboard";
-import { useQrCode } from "./hooks/use-qr-code";
-import { useSessionDrawings } from "./hooks/use-session-drawings";
-import type { Drawing, StudioView } from "./types";
+import { CONFIGURED_SITE_URL } from "./constants";
+import { INVENTORY_PLACEHOLDER_COUNT } from "../../shared/constants";
+import { useCopyToClipboard } from "../../lib/hooks/use-copy-to-clipboard";
+import { useQrCode } from "./use-qr-code";
+import { useSessionDrawings } from "../session/use-session-drawings";
+import type { Drawing } from "../../shared/types";
+
+type StudioView = "transfer" | "character";
 
 function mobileUrlFor(sessionId: string) {
   const siteUrl = CONFIGURED_SITE_URL || window.location.origin;

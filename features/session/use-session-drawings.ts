@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { SESSION_POLL_INTERVAL_MS } from "../constants";
-import type { Drawing, SessionState } from "../types";
+import { SESSION_POLL_INTERVAL_MS } from "./constants";
+import type { Drawing, SessionState } from "../../shared/types";
 
 const NO_DRAWINGS: Drawing[] = [];
 

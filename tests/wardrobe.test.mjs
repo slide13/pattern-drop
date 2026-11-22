@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "../app/equipment-state.ts";
+import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "../features/character/wardrobe.ts";
 
 const fit = {
   scale: 1.42, rotation: -23, x: 31.75, y: -12.5,

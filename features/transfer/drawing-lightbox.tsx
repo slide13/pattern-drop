@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Session images are served as-is from the API. */
-import { useEscapeKey } from "./hooks/use-escape-key";
-import type { Drawing } from "./types";
+import { useEscapeKey } from "../../lib/hooks/use-escape-key";
+import type { Drawing } from "../../shared/types";
 
 export default function DrawingLightbox({
   drawing,
