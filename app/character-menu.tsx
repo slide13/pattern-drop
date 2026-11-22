@@ -3,7 +3,8 @@
 import { useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 import type { Drawing } from "./types";
 import type { Equipment, EquippedItem, SlotKey } from "./equipment.types";
-import { changeEquipment, emptyWardrobe, equipSavedItem } from "./equipment-state";
+import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "./equipment-state";
+import { usePersistentState } from "./hooks/use-persistent-state";
 import { EQUIPMENT_SLOTS, INVENTORY_PLACEHOLDER_COUNT } from "./constants";
 import AvatarFigure, { type Avatar } from "./avatar-figure";
 import WarpedImage from "./warped-image";
@@ -25,6 +26,8 @@ type ItemMovement = {
 };
 
 // `grab` keeps the handle from jumping when it is pressed off-center.
+const isAvatar = (value: unknown): value is Avatar => value === "boy" || value === "girl";
+
 type PointDrag = { slot: SlotKey; pointId: string; pointerId: number; grab: Vec };
 
 /** Converts a pointer position to box pixels of a rotated, scaled item. */
@@ -44,8 +47,9 @@ function newPointId() {
 }
 
 export default function CharacterMenu({ sessionId, drawings }: { sessionId: string; drawings: Drawing[] }) {
-  const [avatar, setAvatar] = useState<Avatar>("girl");
-  const [wardrobe, setWardrobe] = useState(emptyWardrobe);
+  const [avatar, setAvatar] = usePersistentState<Avatar>("patterndrop:avatar", () => "girl", isAvatar);
+  // Outfits belong to a session: its drawings are what the items point to.
+  const [wardrobe, setWardrobe] = usePersistentState(`patterndrop:wardrobe:${sessionId}`, emptyWardrobe, isWardrobe);
   const equipped = wardrobe.equipped;
   const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
   const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);

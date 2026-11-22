@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { changeEquipment, emptyWardrobe, equipSavedItem } from "../app/equipment-state.ts";
+import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "../app/equipment-state.ts";
 
 const fit = {
   scale: 1.42, rotation: -23, x: 31.75, y: -12.5,
@@ -54,4 +54,21 @@ test("the same drawing has independent fits in different slots; a new session st
   assert.equal(state.equipped.accessory.scale, 0.5);
   const fresh = equipSavedItem(emptyWardrobe(), "head", "drawing");
   assert.equal(fresh.equipped.head.scale, 1);
+});
+
+test("a stored wardrobe is accepted only in the current shape", () => {
+  let state = equipSavedItem(emptyWardrobe(), "torso", "shirt");
+  state = changeEquipment(state, current => ({
+    ...current,
+    torso: { ...current.torso, warp: [{ id: "p", x: 10, y: 20, dx: 3, dy: -4, radius: 70 }] },
+  }));
+  assert.equal(isWardrobe(JSON.parse(JSON.stringify(state))), true);
+  assert.equal(isWardrobe(emptyWardrobe()), true);
+  for (const broken of [
+    null, [], { equipped: {} },
+    { equipped: { hat: { drawingId: "a", scale: 1, rotation: 0, x: 0, y: 0 } }, saved: {} },
+    { equipped: { torso: { drawingId: "a", scale: "1", rotation: 0, x: 0, y: 0 } }, saved: {} },
+    // Warp points from before they carried a radius.
+    { equipped: { torso: { drawingId: "a", scale: 1, rotation: 0, x: 0, y: 0, warp: [{ id: "p", x: 0.1, y: 0.2, dx: 0, dy: 0 }] } }, saved: {} },
+  ]) assert.equal(isWardrobe(broken), false, JSON.stringify(broken));
 });

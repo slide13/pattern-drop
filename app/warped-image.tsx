@@ -97,6 +97,8 @@ function drawWarped(canvas: HTMLCanvasElement, image: HTMLImageElement, points: 
 export default function WarpedImage({ src, points }: { src: string; points: WarpPoint[] }) {
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pointsRef = useRef(points);
+  const scheduleRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const image = imageRef.current;
@@ -105,20 +107,38 @@ export default function WarpedImage({ src, points }: { src: string; points: Warp
     // The plain <img> stays on screen until the canvas has something to show, so
     // adding the first point never flashes an empty item.
     const render = () => {
-      const warped = hasDisplacement(points) && drawWarped(canvas, image, points);
+      const current = pointsRef.current;
+      const warped = hasDisplacement(current) && drawWarped(canvas, image, current);
       canvas.hidden = !warped;
       image.style.visibility = warped ? "hidden" : "";
     };
-    render();
-    image.addEventListener("load", render);
+    // Pointer moves can arrive faster than the screen refreshes; draw once per frame.
+    let frame = 0;
+    const schedule = () => {
+      if (!frame)
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          render();
+        });
+    };
+    scheduleRef.current = schedule;
+    schedule();
+    image.addEventListener("load", schedule);
     // The character tab may be hidden (zero size) when the item is first drawn.
-    const observer = new ResizeObserver(render);
+    const observer = new ResizeObserver(schedule);
     observer.observe(image);
     return () => {
-      image.removeEventListener("load", render);
+      cancelAnimationFrame(frame);
+      image.removeEventListener("load", schedule);
       observer.disconnect();
+      scheduleRef.current = () => {};
     };
-  }, [src, points]);
+  }, [src]);
+
+  useEffect(() => {
+    pointsRef.current = points;
+    scheduleRef.current();
+  }, [points]);
 
   return (
     <>

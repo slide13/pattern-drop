@@ -46,9 +46,19 @@ export function openStorage(directory: string) {
     imageCount(sessionId: string) {
       return (db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?").get(sessionId) as { count: number }).count;
     },
-    insertImage(image: Omit<ImageRow, "created_at">) {
-      db.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
-        .run(image.id, image.session_id, image.object_key, image.width, image.height);
+    /** Inserts the image unless the session already holds `limit` images; returns whether it did. */
+    insertImage(image: Omit<ImageRow, "created_at">, limit = Infinity) {
+      // Count and insert in one write transaction so concurrent uploads cannot both pass the check.
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const { count } = db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
+          .get(image.session_id) as { count: number };
+        if (count >= limit) { db.exec("ROLLBACK"); return false; }
+        db.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
+          .run(image.id, image.session_id, image.object_key, image.width, image.height);
+        db.exec("COMMIT");
+        return true;
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
     },
     deleteImageRow(sessionId: string, imageId: string) {
       db.prepare("DELETE FROM session_images WHERE id = ? AND session_id = ?").run(imageId, sessionId);

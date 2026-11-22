@@ -208,3 +208,22 @@ test("rejects uploads once a session reaches its image limit, other sessions una
   assert.equal(f.objects.size, 200);
   await f.upload(otherSessionId);
 });
+
+test("concurrent uploads cannot push a session past its image limit", async t => {
+  const f = fixture(t);
+  for (let i = 0; i < 199; i++) await f.upload();
+  const put = () => handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
+    method: "PUT", headers: { "content-type": "image/png" }, body: png(),
+  }), f.storage);
+  const statuses = (await Promise.all([put(), put(), put()])).map(response => response.status).sort();
+  assert.deepEqual(statuses, [200, 429, 429]);
+  assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS count FROM session_images").get().count, 200);
+  assert.equal(f.objects.size, 200);
+});
+
+test("images are served with nosniff so the browser never reinterprets them", async t => {
+  const f = fixture(t);
+  const image = await f.upload();
+  const response = await f.request("GET", sessionId, image);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+});

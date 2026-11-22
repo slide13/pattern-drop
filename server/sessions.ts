@@ -14,6 +14,7 @@ async function getImage(storage: Storage, sessionId: string, imageId: string) {
   return new Response(body, {
     headers: {
       "content-type": "image/png",
+      "x-content-type-options": "nosniff",
       "cache-control": "private, max-age=60",
       "content-disposition": `inline; filename="pattern-${imageId}.png"`,
     },
@@ -36,20 +37,28 @@ async function deleteImage(storage: Storage, sessionId: string, imageId: string)
   return json({ ok: true });
 }
 
+function sessionFull() {
+  return json({ error: `This session already has ${MAX_IMAGES_PER_SESSION} drawings. Start a new session.` }, 429);
+}
+
 async function uploadImage(request: Request, storage: Storage, sessionId: string) {
-  // Checked before reading the body so a full session cannot be used to fill the disk.
-  if (storage.imageCount(sessionId) >= MAX_IMAGES_PER_SESSION) {
-    return json({ error: `This session already has ${MAX_IMAGES_PER_SESSION} drawings. Start a new session.` }, 429);
-  }
+  // Checked before reading the body so a full session cannot be used to fill the disk;
+  // the insert checks again because other uploads may finish while this body is read.
+  if (storage.imageCount(sessionId) >= MAX_IMAGES_PER_SESSION) return sessionFull();
   const { body, width, height } = await readPngUpload(request);
   const imageId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
   const objectKey = `transfers/${sessionId}/${imageId}.png`;
   await storage.writeImage(objectKey, body);
+  let inserted: boolean;
   try {
-    storage.insertImage({ id: imageId, session_id: sessionId, object_key: objectKey, width, height });
+    inserted = storage.insertImage({ id: imageId, session_id: sessionId, object_key: objectKey, width, height }, MAX_IMAGES_PER_SESSION);
   } catch (error) {
     await storage.deleteImage(objectKey);
     throw error;
+  }
+  if (!inserted) {
+    await storage.deleteImage(objectKey);
+    return sessionFull();
   }
   return json({ ok: true, imageId });
 }
