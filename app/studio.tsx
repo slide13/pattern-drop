@@ -48,6 +48,7 @@ export default function Studio() {
   const [processed, setProcessed] = useState<ProcessedImage | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
   const [activeView, setActiveView] = useState<StudioView>("transfer");
@@ -121,17 +122,17 @@ export default function Studio() {
   async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setBusy(true); setMessage("Removing the background…");
+    setBusy(true); setFailed(false); setMessage("Removing the background…");
     try {
       const result = await cutOutPaper(file);
       setProcessed(result); setMessage("Ready. Check the result.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not process the photo"); }
+    } catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : "Could not process the photo"); }
     finally { setBusy(false); event.target.value = ""; }
   }
 
   async function sendPhoto() {
     if (!processed) return;
-    setBusy(true); setMessage("Sending to the computer…");
+    setBusy(true); setFailed(false); setMessage("Sending to the computer…");
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, {
         method: "PUT",
@@ -140,8 +141,8 @@ export default function Studio() {
       });
       if (!response.ok) throw new Error(await responseError(response, "The server rejected the image"));
       setProcessed(null);
-      setMessage("Added to inventory. You can photograph the next drawing ✓");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not send the photo"); }
+      setMessage("Added to inventory. You can photograph the next drawing.");
+    } catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : "Could not send the photo"); }
     finally { setBusy(false); }
   }
 
@@ -173,7 +174,7 @@ export default function Studio() {
         {/* Without `capture`, phones offer the photo library and files instead of opening the camera. */}
         <input ref={galleryRef} className="visually-hidden" type="file" accept="image/*" onChange={choosePhoto} tabIndex={-1} aria-hidden="true" />
         {!processed && <button className="secondary-button gallery-button" onClick={() => galleryRef.current?.click()} disabled={busy}>Choose from gallery</button>}
-        {message && <div className="mobile-message" role="status"><span>{busy ? "↻" : "✓"}</span>{message}</div>}
+        {message && <div className={`mobile-message ${failed && !busy ? "error" : ""}`} role={failed && !busy ? "alert" : "status"}><span aria-hidden="true">{busy ? "↻" : failed ? "!" : "✓"}</span>{message}</div>}
         {processed && <div className="mobile-actions">
           <button className="secondary-button" onClick={() => inputRef.current?.click()} disabled={busy}>Retake</button>
           <button className="secondary-button" onClick={() => galleryRef.current?.click()} disabled={busy}>Gallery</button>
