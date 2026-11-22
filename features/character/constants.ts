@@ -7,3 +7,6 @@ export const EQUIPMENT_SLOTS: { key: SlotKey; label: string; hint: string }[] = 
   { key: "feet", label: "Feet", hint: "footwear" },
   { key: "accessory", label: "Accessory", hint: "extra item" },
 ];
+
+/** Drag-and-drop payload type carrying a drawing id from the inventory to a slot. */
+export const DRAWING_MIME = "text/patterndrop";

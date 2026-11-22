@@ -7,6 +7,7 @@ import { INVENTORY_PLACEHOLDER_COUNT } from "../../shared/constants";
 import { useCopyToClipboard } from "../../lib/hooks/use-copy-to-clipboard";
 import { useQrCode } from "./use-qr-code";
 import { useSessionDrawings } from "../session/use-session-drawings";
+import { drawingUrl } from "../session/api";
 import type { Drawing } from "../../shared/types";
 
 type StudioView = "transfer" | "character";
@@ -27,7 +28,7 @@ export default function DesktopStudio({
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
   const [activeView, setActiveView] = useState<StudioView>("transfer");
   const closeLightbox = useCallback(() => setSelectedDrawing(null), []);
-  const drawingUrl = (drawing: Drawing) => `/api/sessions/${sessionId}/images/${drawing.id}`;
+  const drawingSrc = (drawing: Drawing) => drawingUrl(sessionId, drawing.id);
 
   function restart() {
     setSelectedDrawing(null);
@@ -91,7 +92,7 @@ export default function DesktopStudio({
           {drawings.length ? (
             <DrawingInventory
               drawings={drawings}
-              drawingUrl={drawingUrl}
+              drawingUrl={drawingSrc}
               onSelect={setSelectedDrawing}
               onRestart={restart}
             />
@@ -110,7 +111,7 @@ export default function DesktopStudio({
       {selectedDrawing && (
         <DrawingLightbox
           drawing={selectedDrawing}
-          src={drawingUrl(selectedDrawing)}
+          src={drawingSrc(selectedDrawing)}
           onClose={closeLightbox}
         />
       )}

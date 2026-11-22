@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe } from "../features/character/wardrobe.ts";
+import {
+  addItemWarpPoint, changeEquipment, emptyWardrobe, equipSavedItem, isWardrobe,
+  moveItemWarpPoint, removeItemWarpPoint, unequip, updateItem,
+} from "../features/character/wardrobe.ts";
 
 const fit = {
   scale: 1.42, rotation: -23, x: 31.75, y: -12.5,
@@ -71,4 +74,25 @@ test("a stored wardrobe is accepted only in the current shape", () => {
     // Warp points from before they carried a radius.
     { equipped: { torso: { drawingId: "a", scale: 1, rotation: 0, x: 0, y: 0, warp: [{ id: "p", x: 0.1, y: 0.2, dx: 0, dy: 0 }] } }, saved: {} },
   ]) assert.equal(isWardrobe(broken), false, JSON.stringify(broken));
+});
+
+test("item edits and warp points go through the wardrobe and are remembered per drawing", () => {
+  let state = equipSavedItem(emptyWardrobe(), "torso", "shirt");
+  state = updateItem(state, "torso", () => ({ x: 12, y: -4 }));
+  state = addItemWarpPoint(state, "torso", { x: 50, y: 60 }, 80, "p1");
+  state = moveItemWarpPoint(state, "torso", "p1", { x: 40, y: 55 });
+  assert.deepEqual(state.equipped.torso.warp, [{ id: "p1", x: 50, y: 60, dx: -10, dy: -5, radius: 80 }]);
+  assert.equal(state.equipped.torso.x, 12);
+
+  // A crowded point and an empty slot leave the state untouched.
+  assert.equal(addItemWarpPoint(state, "torso", { x: 41, y: 55 }, 80, "p2"), state);
+  assert.equal(updateItem(state, "legs", () => ({ x: 1 })), state);
+
+  state = unequip(state, "torso");
+  assert.equal(state.equipped.torso, undefined);
+  state = equipSavedItem(state, "torso", "shirt");
+  assert.equal(state.equipped.torso.warp.length, 1, "the fit, warp included, comes back on re-equip");
+
+  state = removeItemWarpPoint(state, "torso", "p1");
+  assert.deepEqual(state.equipped.torso.warp, []);
 });

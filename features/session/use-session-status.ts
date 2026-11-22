@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { usePolling } from "../../lib/hooks/use-polling";
+import { fetchDrawings } from "./api";
 import { SESSION_POLL_INTERVAL_MS } from "./constants";
 
 export type SessionStatus = "checking" | "found" | "missing";
@@ -7,31 +9,18 @@ export type SessionStatus = "checking" | "found" | "missing";
 export function useSessionStatus(sessionId: string) {
   const [status, setStatus] = useState<{ sessionId: string; value: SessionStatus } | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    const check = async () => {
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (response.ok || response.status === 404) {
-          setStatus({ sessionId, value: response.ok ? "found" : "missing" });
-          return;
-        }
-      } catch {
-        if (controller.signal.aborted) return;
-      }
+  usePolling(
+    sessionId,
+    () => async (signal) => {
+      const result = await fetchDrawings(sessionId, signal);
       // Offline or a server error says nothing about the session: ask again later.
-      timer = setTimeout(check, SESSION_POLL_INTERVAL_MS);
-    };
-    void check();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [sessionId]);
+      if (result.status === "error") return "continue";
+      if (!signal.aborted)
+        setStatus({ sessionId, value: result.status === "ok" ? "found" : "missing" });
+      return "stop";
+    },
+    { intervalMs: SESSION_POLL_INTERVAL_MS },
+  );
 
   // For requests that learn the session is gone after the initial check.
   const markMissing = useCallback(() => setStatus({ sessionId, value: "missing" }), [sessionId]);

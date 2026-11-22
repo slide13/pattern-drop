@@ -1,5 +1,5 @@
 import type { Equipment, EquippedItem, SlotKey, Wardrobe } from "./wardrobe.types";
-import type { WarpPoint } from "./warp/warp";
+import { addWarpPoint, moveWarpPoint, type Vec, type WarpPoint } from "./warp/warp.ts";
 
 export function emptyWardrobe(): Wardrobe {
   return { equipped: {}, saved: {} };
@@ -27,6 +27,39 @@ export function equipSavedItem(state: Wardrobe, slot: SlotKey, drawingId: string
     drawingId, scale: 1, rotation: 0, x: 0, y: 0,
   };
   return changeEquipment(state, current => ({ ...current, [slot]: item }));
+}
+
+/** Applies `update` to the item in `slot`; `null` (or an empty slot) leaves the state as is. */
+export function updateItem(
+  state: Wardrobe,
+  slot: SlotKey,
+  update: (item: EquippedItem) => Partial<EquippedItem> | null,
+): Wardrobe {
+  return changeEquipment(state, current => {
+    const item = current[slot];
+    const patch = item && update(item);
+    return item && patch ? { ...current, [slot]: { ...item, ...patch } } : current;
+  });
+}
+
+export function unequip(state: Wardrobe, slot: SlotKey): Wardrobe {
+  return changeEquipment(state, current => (current[slot] ? { ...current, [slot]: undefined } : current));
+}
+
+/** Adds a warp point under `target` (item box pixels); nothing happens when it would crowd another. */
+export function addItemWarpPoint(state: Wardrobe, slot: SlotKey, target: Vec, radius: number, id: string) {
+  return updateItem(state, slot, item => {
+    const warp = addWarpPoint(item.warp ?? [], target, radius, id);
+    return warp && { warp };
+  });
+}
+
+export function moveItemWarpPoint(state: Wardrobe, slot: SlotKey, pointId: string, target: Vec) {
+  return updateItem(state, slot, item => ({ warp: moveWarpPoint(item.warp ?? [], pointId, target) }));
+}
+
+export function removeItemWarpPoint(state: Wardrobe, slot: SlotKey, pointId: string) {
+  return updateItem(state, slot, item => ({ warp: item.warp?.filter(point => point.id !== pointId) }));
 }
 
 // Kept here rather than imported from constants so the module stays runnable in plain Node tests.

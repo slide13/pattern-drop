@@ -1,22 +1,12 @@
 import { useEffect, useState } from "react";
 import { cutOutPaper } from "../image-processing/process-image";
 import type { ProcessedImage } from "../image-processing/process-image";
+import { uploadDrawing } from "../session/api";
 
 export type UploadStatus = {
   phase: "idle" | "busy" | "done" | "error";
   message: string;
 };
-
-async function responseError(response: Response, fallback: string) {
-  try {
-    const body: unknown = await response.json();
-    if (body && typeof body === "object" && "error" in body && typeof body.error === "string")
-      return body.error;
-  } catch {
-    /* Not JSON. */
-  }
-  return fallback;
-}
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -54,28 +44,22 @@ export function usePhotoUpload(
   async function sendPhoto() {
     if (!processed || !enabled) return;
     setStatus({ phase: "busy", message: "Sending to the computer…" });
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
-        method: "PUT",
-        headers: { "content-type": "image/png" },
-        body: processed.blob,
-      });
-      if (response.status === 404) {
-        setProcessed(null);
-        setStatus({ phase: "idle", message: "" });
-        onSessionMissing();
-        return;
-      }
-      if (!response.ok)
-        throw new Error(await responseError(response, "The server rejected the image"));
+    const result = await uploadDrawing(sessionId, processed.blob);
+    if (result.status === "missing") {
       setProcessed(null);
-      setStatus({
-        phase: "done",
-        message: "Added to inventory. You can photograph the next drawing.",
-      });
-    } catch (error) {
-      setStatus({ phase: "error", message: errorMessage(error, "Could not send the photo") });
+      setStatus({ phase: "idle", message: "" });
+      onSessionMissing();
+      return;
     }
+    if (result.status === "error") {
+      setStatus({ phase: "error", message: result.message || "Could not send the photo" });
+      return;
+    }
+    setProcessed(null);
+    setStatus({
+      phase: "done",
+      message: "Added to inventory. You can photograph the next drawing.",
+    });
   }
 
   return { processed, status, busy: status.phase === "busy", processPhoto, sendPhoto };
