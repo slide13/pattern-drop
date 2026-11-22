@@ -1,0 +1,504 @@
+/* Character screen: inventory, avatar board, worn items and equipment panel. */
+
+.character-screen {
+  width: min(1540px, 94vw);
+  margin: auto;
+  padding: 30px 0 48px;
+  flex: 1;
+}
+.character-titlebar {
+  min-height: 68px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.character-titlebar > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.character-titlebar > div:first-child > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  background: var(--acid);
+  font: 700 11px var(--font-mono);
+}
+.character-titlebar b {
+  display: block;
+  font: 800 14px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+.character-titlebar small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.avatar-switch {
+  display: flex;
+  border: 1px solid var(--ink);
+  background: white;
+}
+.avatar-switch button {
+  min-width: 100px;
+  padding: 11px 15px;
+  border: 0;
+  border-right: 1px solid var(--ink);
+  background: white;
+  cursor: pointer;
+  font: 700 10px var(--font-mono);
+}
+.avatar-switch button:last-child {
+  border-right: 0;
+}
+.avatar-switch button.active {
+  background: var(--ink);
+  color: var(--acid);
+}
+.character-layout {
+  display: grid;
+  grid-template-columns: 270px minmax(400px, 1fr) 300px;
+  gap: 14px;
+  min-height: 650px;
+}
+.game-inventory,
+.equipment-panel {
+  background: white;
+  border: 1px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+  padding: 18px;
+}
+.game-panel-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
+  font: 700 10px var(--font-mono);
+  letter-spacing: 0.09em;
+}
+.game-panel-label b {
+  padding: 5px 7px;
+  background: var(--acid);
+  font-size: 8px;
+}
+.game-inventory > p {
+  margin: 14px 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.game-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  max-height: 480px;
+  overflow: auto;
+  padding: 2px;
+}
+.game-item {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aaada5;
+  background: #e8e8e2;
+  cursor: grab;
+}
+.game-item:active {
+  cursor: grabbing;
+}
+.game-item img {
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 3px #0002);
+}
+.game-item span {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  color: #777a74;
+  font: 700 7px var(--font-mono);
+}
+.game-item.held {
+  outline: 3px solid var(--acid);
+  border-color: var(--ink);
+}
+.game-item.vacant {
+  border-style: dashed;
+  color: #b6b8b1;
+  cursor: default;
+  font: 400 18px var(--font-mono);
+}
+.empty-inventory {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.avatar-board {
+  position: relative;
+  min-height: 650px;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+  background-color: #deded8;
+  background-image: linear-gradient(#c9cbc4 1px, transparent 1px),
+    linear-gradient(90deg, #c9cbc4 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.avatar-caption {
+  position: absolute;
+  z-index: 12;
+  top: 16px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  color: #747870;
+  font: 700 8px var(--font-mono);
+  letter-spacing: 0.1em;
+}
+.avatar-caption span:first-child {
+  padding: 6px 8px;
+  background: white;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+.avatar-floor {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: 300px;
+  height: 28px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #0002;
+  filter: blur(4px);
+}
+.paper-doll {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  width: 320px;
+  height: 585px;
+  transform: translateX(-50%);
+  isolation: isolate;
+}
+.doll-figure {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.worn-item {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: center;
+}
+.worn-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 4px #0003);
+}
+.worn-item.selected {
+  outline: 2px dashed var(--acid);
+  outline-offset: 3px;
+}
+.worn-head {
+  top: 7.5%;
+  width: 100px;
+  height: 100px;
+}
+.worn-torso {
+  top: 34%;
+  width: 200px;
+  height: 225px;
+}
+.worn-legs {
+  top: 72%;
+  width: 170px;
+  height: 300px;
+}
+.worn-feet {
+  top: 96%;
+  width: 150px;
+  height: 62px;
+}
+.worn-accessory {
+  top: 55%;
+  left: 75%;
+  width: 120px;
+  height: 150px;
+}
+.equipment-slots {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+}
+.equipment-slot {
+  width: 100%;
+  min-height: 61px;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  text-align: left;
+  border: 1px solid #b8bbb3;
+  background: #efefe9;
+  cursor: pointer;
+}
+.equipment-slot.active {
+  border-color: var(--ink);
+  outline: 3px solid var(--acid);
+}
+.equipment-slot.filled {
+  background: white;
+}
+.slot-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed #9ea198;
+  background: #dadbd4;
+  color: #a4a79f;
+  font: 400 18px var(--font-mono);
+}
+.slot-icon img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+}
+.equipment-slot b,
+.equipment-slot small {
+  display: block;
+}
+.equipment-slot b {
+  font-size: 11px;
+}
+.equipment-slot small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+}
+.item-controls {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ink);
+  opacity: 0.45;
+}
+.item-controls.enabled {
+  opacity: 1;
+}
+.controls-title {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font: 700 8px var(--font-mono);
+  letter-spacing: 0.07em;
+}
+.controls-title b {
+  color: #6e726a;
+}
+.item-controls label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  font: 700 9px var(--font-mono);
+}
+.item-controls input {
+  grid-column: 1/-1;
+  width: 100%;
+  accent-color: var(--ink);
+}
+.rotation-control {
+  margin-top: 15px;
+}
+.rotation-control > span {
+  display: block;
+  margin-bottom: 7px;
+  font: 700 9px var(--font-mono);
+}
+.rotation-control > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.rotation-control button,
+.remove-item {
+  min-height: 38px;
+  border: 1px solid var(--ink);
+  background: white;
+  cursor: pointer;
+  font: 700 9px var(--font-mono);
+}
+.rotation-control button:disabled,
+.remove-item:disabled {
+  cursor: not-allowed;
+}
+.remove-item {
+  width: 100%;
+  margin-top: 10px;
+  background: var(--ink);
+  color: white;
+}
+@media (max-width: 1100px) {
+  .character-layout {
+    grid-template-columns: 220px minmax(340px, 1fr) 260px;
+  }
+  .character-screen {
+    width: 97vw;
+  }
+  .game-items {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 820px) {
+  .character-titlebar {
+    align-items: flex-start;
+    gap: 15px;
+  }
+  .character-layout {
+    grid-template-columns: 1fr;
+  }
+  .avatar-board {
+    min-height: 650px;
+    order: 1;
+  }
+  .game-inventory {
+    order: 2;
+  }
+  .equipment-panel {
+    order: 3;
+  }
+  .game-items {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .character-screen {
+    width: calc(100vw - 24px);
+  }
+}
+.worn-item {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.worn-item:active {
+  cursor: grabbing;
+}
+.worn-item img {
+  pointer-events: none;
+}
+.rotation-control .control-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font: 700 9px var(--font-mono);
+}
+.rotation-control .rotation-slider {
+  display: block;
+  width: 100%;
+  margin: 0 0 9px;
+  accent-color: var(--ink);
+}
+.rotation-control .degree-buttons {
+  display: grid;
+  grid-template-columns: 1fr 66px 1fr;
+  gap: 6px;
+}
+.degree-buttons input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font: 700 10px var(--font-mono);
+}
+.center-item {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 10px;
+  border: 1px solid var(--ink);
+  background: white;
+  cursor: pointer;
+  font: 700 9px var(--font-mono);
+}
+.center-item:disabled {
+  cursor: not-allowed;
+}
+.worn-item-body {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: inherit;
+  touch-action: none;
+}
+.warped-image {
+  position: absolute;
+  left: -25%;
+  top: -25%;
+  width: 150%;
+  height: 150%;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 4px #0003);
+}
+.warp-handle {
+  position: absolute;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--acid);
+  box-shadow: 0 0 0 2px white;
+  transform: translate(-50%, -50%) scale(calc(1 / var(--item-scale, 1)));
+  cursor: move;
+  touch-action: none;
+}
+.warp-handle:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.warp-control {
+  margin-top: 15px;
+}
+.warp-control .control-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 700 9px var(--font-mono);
+}
+.warp-control p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}

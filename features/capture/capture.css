@@ -1,0 +1,215 @@
+/* Phone capture screen. */
+
+.phone-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: #f4f3ee;
+}
+.phone-header {
+  height: 68px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+.phone-header .brand {
+  font-size: 15px;
+}
+.phone-header .brand-mark {
+  width: 25px;
+  height: 25px;
+}
+.secure-pill {
+  padding: 7px 9px;
+  background: white;
+  border: 1px solid var(--line);
+  font: 700 8px var(--font-mono);
+  letter-spacing: 0.05em;
+}
+.secure-pill i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  background: #75bd15;
+  border-radius: 50%;
+}
+.capture-card {
+  width: min(560px, calc(100vw - 28px));
+  margin: 24px auto 10px;
+  padding: 26px 20px 22px;
+  background: white;
+  border: 1px solid var(--ink);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+.step {
+  margin-bottom: 16px;
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+  letter-spacing: 0.12em;
+}
+.capture-card h1 {
+  margin: 0 0 10px;
+  font-size: clamp(29px, 9vw, 43px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+.capture-card > p {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.camera-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/5;
+  max-height: 54svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px dashed #8c9088;
+  background: #edede7;
+  cursor: pointer;
+  overflow: hidden;
+}
+.camera-stage:disabled {
+  opacity: 0.65;
+}
+.camera-stage strong {
+  font-size: 14px;
+}
+.camera-stage small {
+  color: var(--muted);
+  font: 400 9px var(--font-mono);
+}
+.camera-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  background: var(--acid);
+  border-radius: 50%;
+  border: 1px solid var(--ink);
+  font-size: 21px;
+}
+.focus-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+}
+.corner-a {
+  top: 13px;
+  left: 13px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+.corner-b {
+  top: 13px;
+  right: 13px;
+  border-top: 2px solid;
+  border-right: 2px solid;
+}
+.corner-c {
+  bottom: 13px;
+  left: 13px;
+  border-bottom: 2px solid;
+  border-left: 2px solid;
+}
+.corner-d {
+  bottom: 13px;
+  right: 13px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+.camera-stage.has-preview {
+  background-color: #dfdfda;
+  background-image: linear-gradient(45deg, #d2d2cc 25%, transparent 25%),
+    linear-gradient(-45deg, #d2d2cc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d2d2cc 75%),
+    linear-gradient(-45deg, transparent 75%, #d2d2cc 75%);
+  background-size: 20px 20px;
+  background-position:
+    0 0,
+    0 10px,
+    10px -10px,
+    -10px 0;
+  border-style: solid;
+}
+.camera-stage img {
+  max-width: 92%;
+  max-height: 92%;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 12px #0002);
+}
+.mobile-message {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #41443f;
+  font-size: 11px;
+}
+.mobile-message span {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  background: var(--acid);
+  border-radius: 50%;
+  font-weight: 800;
+}
+.mobile-message.error {
+  color: #a3261b;
+}
+.mobile-message.error span {
+  background: #e5483b;
+  color: white;
+}
+.mobile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.gallery-button {
+  width: 100%;
+  margin-top: 10px;
+}
+.mobile-actions button {
+  padding: 0 8px;
+}
+.privacy-note {
+  margin: auto auto 18px;
+  padding-top: 18px;
+  color: var(--muted);
+  font: 400 8px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.camera-stage img {
+  display: block;
+  width: 92%;
+  height: 92%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+}
+.secure-pill.checking i {
+  background: #b4b7af;
+  animation: pulse 1.5s infinite;
+}
+.secure-pill.missing {
+  border-color: #e5483b;
+  color: #a3261b;
+}
+.secure-pill.missing i {
+  background: #e5483b;
+}
