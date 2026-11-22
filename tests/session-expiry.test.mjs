@@ -22,17 +22,30 @@ const png = (() => {
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), "patterndrop-expiry-"));
   const storage = openStorage(directory);
-  t.after(() => { storage.close(); rmSync(directory, { recursive: true, force: true }); });
-  const call = (method, sessionId, body) => handleSessionRequest(new Request(`http://localhost/api/sessions/${sessionId}`, {
-    method, ...(body ? { headers: { "content-type": "image/png" }, body } : {}),
-  }), storage);
-  const lastSeen = sessionId => storage.db.prepare("SELECT last_seen_at FROM sessions WHERE id = ?").get(sessionId)?.last_seen_at;
-  const age = (sessionId, modifier) => storage.db.prepare("UPDATE sessions SET last_seen_at = datetime('now', ?) WHERE id = ?").run(modifier, sessionId);
-  const folder = sessionId => join(directory, "images", "transfers", sessionId);
+  t.after(() => {
+    storage.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const call = (method, sessionId, body) =>
+    handleSessionRequest(
+      new Request(`http://localhost/api/sessions/${sessionId}`, {
+        method,
+        ...(body ? { headers: { "content-type": "image/png" }, body } : {}),
+      }),
+      storage,
+    );
+  const lastSeen = (sessionId) =>
+    storage.db.prepare("SELECT last_seen_at FROM sessions WHERE id = ?").get(sessionId)
+      ?.last_seen_at;
+  const age = (sessionId, modifier) =>
+    storage.db
+      .prepare("UPDATE sessions SET last_seen_at = datetime('now', ?) WHERE id = ?")
+      .run(modifier, sessionId);
+  const folder = (sessionId) => join(directory, "images", "transfers", sessionId);
   return { storage, call, lastSeen, age, folder };
 }
 
-test("expired sessions lose their drawings and files; recent ones are kept", async t => {
+test("expired sessions lose their drawings and files; recent ones are kept", async (t) => {
   const f = fixture(t);
   for (const id of [stale, fresh]) {
     await f.call("POST", id);
@@ -44,12 +57,17 @@ test("expired sessions lose their drawings and files; recent ones are kept", asy
 
   assert.equal((await f.call("GET", stale)).status, 404);
   assert.equal(existsSync(f.folder(stale)), false);
-  assert.equal(f.storage.db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?").get(stale).count, 0);
+  assert.equal(
+    f.storage.db
+      .prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
+      .get(stale).count,
+    0,
+  );
   assert.equal((await (await f.call("GET", fresh)).json()).drawings.length, 1);
   assert.equal(existsSync(f.folder(fresh)), true);
 });
 
-test("using a session keeps it alive, but polling writes at most hourly", async t => {
+test("using a session keeps it alive, but polling writes at most hourly", async (t) => {
   const f = fixture(t);
   await f.call("POST", stale);
   f.age(stale, "-30 minutes");
@@ -59,28 +77,42 @@ test("using a session keeps it alive, but polling writes at most hourly", async 
 
   f.age(stale, "-8 days");
   await f.call("GET", stale);
-  assert.equal(await removeExpiredSessions(f.storage, 7), 0, "a poll after a long pause renews the session");
+  assert.equal(
+    await removeExpiredSessions(f.storage, 7),
+    0,
+    "a poll after a long pause renews the session",
+  );
 
   f.age(stale, "-8 days");
   await f.call("POST", stale);
   assert.equal(await removeExpiredSessions(f.storage, 7), 0, "re-registering renews the session");
 });
 
-test("upgrading dates existing sessions by their latest upload", t => {
+test("upgrading dates existing sessions by their latest upload", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "patterndrop-expiry-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const legacy = new DatabaseSync(join(directory, "patterndrop.sqlite"));
   for (const migration of MIGRATIONS.slice(0, 5)) legacy.exec(migration);
   legacy.exec("PRAGMA user_version = 5");
-  legacy.prepare("INSERT INTO sessions (id, created_at) VALUES (?, '2020-01-01 00:00:00')").run(stale);
-  legacy.prepare("INSERT INTO session_images (id, session_id, object_key, width, height, created_at) VALUES (?, ?, ?, 10, 20, '2024-05-06 07:08:09')")
+  legacy
+    .prepare("INSERT INTO sessions (id, created_at) VALUES (?, '2020-01-01 00:00:00')")
+    .run(stale);
+  legacy
+    .prepare(
+      "INSERT INTO session_images (id, session_id, object_key, width, height, created_at) VALUES (?, ?, ?, 10, 20, '2024-05-06 07:08:09')",
+    )
     .run("aaaaaaaaaaaaaaaa", stale, `transfers/${stale}/aaaaaaaaaaaaaaaa.png`);
-  legacy.prepare("INSERT INTO sessions (id, created_at) VALUES (?, '2023-03-04 05:06:07')").run(fresh);
+  legacy
+    .prepare("INSERT INTO sessions (id, created_at) VALUES (?, '2023-03-04 05:06:07')")
+    .run(fresh);
   legacy.close();
   const storage = openStorage(directory);
   try {
-    const seen = id => storage.db.prepare("SELECT last_seen_at FROM sessions WHERE id = ?").get(id).last_seen_at;
+    const seen = (id) =>
+      storage.db.prepare("SELECT last_seen_at FROM sessions WHERE id = ?").get(id).last_seen_at;
     assert.equal(seen(stale), "2024-05-06 07:08:09");
     assert.equal(seen(fresh), "2023-03-04 05:06:07");
-  } finally { storage.close(); }
+  } finally {
+    storage.close();
+  }
 });

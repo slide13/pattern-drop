@@ -54,7 +54,10 @@ test("pulling a point never pushes any part of the image the other way", () => {
 });
 
 test("nothing moves beyond a point's radius", () => {
-  const points = moveWarpPoint(addWarpPoint([], { x: 20, y: 100 }, radius, "a"), "a", { x: 0, y: 100 });
+  const points = moveWarpPoint(addWarpPoint([], { x: 20, y: 100 }, radius, "a"), "a", {
+    x: 0,
+    y: 100,
+  });
   assert.deepEqual(createWarpField(points)(20 + radius + 1, 100), { x: 0, y: 0 });
 });
 
@@ -64,7 +67,10 @@ test("a point too close to another one is not added", () => {
 });
 
 test("inverting the warp finds the source pixel shown at a position", () => {
-  const points = moveWarpPoint(addWarpPoint([], { x: 80, y: 90 }, radius, "a"), "a", { x: 90, y: 108 });
+  const points = moveWarpPoint(addWarpPoint([], { x: 80, y: 90 }, radius, "a"), "a", {
+    x: 90,
+    y: 108,
+  });
   const field = createWarpField(points);
   const target = { x: 95, y: 110 };
   const source = invertWarp(field, target);
@@ -74,8 +80,16 @@ test("inverting the warp finds the source pixel shown at a position", () => {
 });
 
 test("triangle transform maps each source corner onto its destination", () => {
-  const from = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }];
-  const to = [{ x: 5, y: 7 }, { x: 25, y: 9 }, { x: 3, y: 30 }];
+  const from = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 0, y: 10 },
+  ];
+  const to = [
+    { x: 5, y: 7 },
+    { x: 25, y: 9 },
+    { x: 3, y: 30 },
+  ];
   const [a, b, c, d, e, f] = triangleTransform(from, to);
   from.forEach((p, i) => {
     close(a * p.x + c * p.y + e, to[i].x, 1e-9);

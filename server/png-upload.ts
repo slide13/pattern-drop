@@ -23,7 +23,8 @@ export async function readPngUpload(request: Request) {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
     const declaredSize = Number(contentLength);
-    if (!Number.isSafeInteger(declaredSize) || declaredSize < 0) throw new UploadError("Invalid Content-Length", 400);
+    if (!Number.isSafeInteger(declaredSize) || declaredSize < 0)
+      throw new UploadError("Invalid Content-Length", 400);
     if (declaredSize > MAX_UPLOAD_BYTES) throw new UploadError("Image is too large", 413);
   }
   if (!request.body) throw new UploadError("Expected an image body", 400);
@@ -59,7 +60,7 @@ export async function readPngUpload(request: Request) {
   const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
   const width = view.getUint32(16);
   const height = view.getUint32(20);
-  if (![width, height].every(value => value >= 1 && value <= MAX_IMAGE_DIMENSION)) {
+  if (![width, height].every((value) => value >= 1 && value <= MAX_IMAGE_DIMENSION)) {
     throw new UploadError("Invalid image dimensions", 400);
   }
   return { body, width, height };

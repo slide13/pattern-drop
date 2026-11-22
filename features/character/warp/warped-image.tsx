@@ -1,6 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- User-uploaded images are served directly. */
 import { useEffect, useRef } from "react";
-import { createWarpField, hasDisplacement, triangleTransform, type Vec, type WarpPoint } from "./warp";
+import {
+  createWarpField,
+  hasDisplacement,
+  triangleTransform,
+  type Vec,
+  type WarpPoint,
+} from "./warp";
 
 /** Mesh cells per side; more cells bend more smoothly but cost more per frame. */
 const GRID = 20;
@@ -85,7 +91,17 @@ function drawWarped(canvas: HTMLCanvasElement, image: HTMLImageElement, points: 
         context.closePath();
         context.clip();
         context.transform(...triangleTransform([...corners[t]], [...moved[t]]));
-        context.drawImage(image, sx, sy, sw, sh, left + sx * fit, top + sy * fit, sw * fit, sh * fit);
+        context.drawImage(
+          image,
+          sx,
+          sy,
+          sw,
+          sh,
+          left + sx * fit,
+          top + sy * fit,
+          sw * fit,
+          sh * fit,
+        );
         context.restore();
       }
     }

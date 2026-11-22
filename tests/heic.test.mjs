@@ -7,8 +7,14 @@ function ftyp(major, compatible = []) {
   const size = 8 + brands.length;
   const bytes = new Uint8Array(size);
   new DataView(bytes.buffer).setUint32(0, size);
-  bytes.set([..."ftyp"].map(c => c.charCodeAt(0)), 4);
-  bytes.set([...brands].map(c => c.charCodeAt(0)), 8);
+  bytes.set(
+    [..."ftyp"].map((c) => c.charCodeAt(0)),
+    4,
+  );
+  bytes.set(
+    [...brands].map((c) => c.charCodeAt(0)),
+    8,
+  );
   return bytes;
 }
 
@@ -21,7 +27,10 @@ test("recognises iPhone HEIC and generic HEIF headers", () => {
 test("rejects other files and short or malformed input", () => {
   assert.equal(isHeifHeader(ftyp("isom", ["mp41", "avc1"])), false);
   assert.equal(isHeifHeader(ftyp("avif", ["avif"])), false);
-  assert.equal(isHeifHeader(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1])), false);
+  assert.equal(
+    isHeifHeader(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1])),
+    false,
+  );
   assert.equal(isHeifHeader(new Uint8Array([0, 0, 0, 24, 102, 116])), false);
   const huge = ftyp("isom");
   new DataView(huge.buffer).setUint32(0, 0xffffffff);

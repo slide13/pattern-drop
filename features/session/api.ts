@@ -7,7 +7,9 @@ export const drawingUrl = (sessionId: string, drawingId: string) =>
 
 /** A definite answer about the session, or a failure (offline, server error) worth retrying. */
 export type SessionResult<T> =
-  { status: "ok"; data: T } | { status: "missing" } | { status: "error"; message: string };
+  | { status: "ok"; data: T }
+  | { status: "missing" }
+  | { status: "error"; message: string };
 
 async function errorMessage(response: Response, fallback: string) {
   try {

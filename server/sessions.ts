@@ -38,7 +38,10 @@ async function deleteImage(storage: Storage, sessionId: string, imageId: string)
 }
 
 function sessionFull() {
-  return json({ error: `This session already has ${MAX_IMAGES_PER_SESSION} drawings. Start a new session.` }, 429);
+  return json(
+    { error: `This session already has ${MAX_IMAGES_PER_SESSION} drawings. Start a new session.` },
+    429,
+  );
 }
 
 async function uploadImage(request: Request, storage: Storage, sessionId: string) {
@@ -51,7 +54,10 @@ async function uploadImage(request: Request, storage: Storage, sessionId: string
   await storage.writeImage(objectKey, body);
   let inserted: boolean;
   try {
-    inserted = storage.insertImage({ id: imageId, session_id: sessionId, object_key: objectKey, width, height }, MAX_IMAGES_PER_SESSION);
+    inserted = storage.insertImage(
+      { id: imageId, session_id: sessionId, object_key: objectKey, width, height },
+      MAX_IMAGES_PER_SESSION,
+    );
   } catch (error) {
     await storage.deleteImage(objectKey);
     throw error;
@@ -63,7 +69,12 @@ async function uploadImage(request: Request, storage: Storage, sessionId: string
   return json({ ok: true, imageId });
 }
 
-async function handleSession(request: Request, storage: Storage, sessionId: string, imageId?: string) {
+async function handleSession(
+  request: Request,
+  storage: Storage,
+  sessionId: string,
+  imageId?: string,
+) {
   if (!imageId && request.method === "POST") {
     storage.createSession(sessionId);
     return json({ ok: true });
@@ -77,7 +88,9 @@ async function handleSession(request: Request, storage: Storage, sessionId: stri
   }
 
   if (request.method === "GET") {
-    const drawings = storage.images(sessionId).map(({ id, width, height }) => ({ id, width, height }));
+    const drawings = storage
+      .images(sessionId)
+      .map(({ id, width, height }) => ({ id, width, height }));
     return json({ drawings });
   }
   if (request.method === "PUT") return uploadImage(request, storage, sessionId);
@@ -85,7 +98,9 @@ async function handleSession(request: Request, storage: Storage, sessionId: stri
 }
 
 export async function handleSessionRequest(request: Request, storage?: Storage): Promise<Response> {
-  const match = new URL(request.url).pathname.match(/^\/api\/sessions\/([a-f0-9]{16})(?:\/images\/([a-f0-9]{16}))?$/);
+  const match = new URL(request.url).pathname.match(
+    /^\/api\/sessions\/([a-f0-9]{16})(?:\/images\/([a-f0-9]{16}))?$/,
+  );
   if (!match) return json({ error: "Not found" }, 404);
   try {
     return await handleSession(request, storage ?? getStorage(), match[1], match[2]);

@@ -16,16 +16,23 @@ function metadataBase() {
 export const metadata: Metadata = {
   metadataBase: metadataBase(),
   title: "PatternDrop — sketches from paper to screen",
-  description: "Photograph your clothing drawing, remove the background, and instantly transfer it to your computer.",
+  description:
+    "Photograph your clothing drawing, remove the background, and instantly transfer it to your computer.",
   icons: { icon: "/favicon.svg" },
   openGraph: {
     title: "PatternDrop",
     description: "From paper to screen.",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "PatternDrop: from paper to screen" }],
+    images: [
+      { url: "/og.png", width: 1200, height: 630, alt: "PatternDrop: from paper to screen" },
+    ],
   },
   twitter: { card: "summary_large_image", images: ["/og.png"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={`${manrope.variable} ${mono.variable}`}>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body className={`${manrope.variable} ${mono.variable}`}>{children}</body>
+    </html>
+  );
 }

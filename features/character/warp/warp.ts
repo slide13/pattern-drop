@@ -7,7 +7,14 @@
 
 export type Vec = { x: number; y: number };
 /** A control point: the image pixel it is pinned to, its own drag, and its reach. */
-export type WarpPoint = { id: string; x: number; y: number; dx: number; dy: number; radius: number };
+export type WarpPoint = {
+  id: string;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  radius: number;
+};
 export type WarpField = (x: number, y: number) => Vec;
 
 /** Reach of a new point, as a fraction of the item's larger side; nothing beyond it moves. */

@@ -24,7 +24,9 @@ async function decodePhoto(file: File, onStatus?: (message: string) => void) {
     return await heicTo({ blob: file, type: "bitmap" });
   } catch (error) {
     console.error("HEIC decoding failed:", error);
-    throw new Error("Could not read this HEIC photo. Try another photo or take a new one with the camera.");
+    throw new Error(
+      "Could not read this HEIC photo. Try another photo or take a new one with the camera.",
+    );
   }
 }
 
@@ -63,14 +65,21 @@ function cutOutOnMainThread(bitmap: ImageBitmap) {
     (width, height) => Object.assign(document.createElement("canvas"), { width, height }),
     (canvas) =>
       new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Export failed"))), "image/png"),
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("Export failed"))),
+          "image/png",
+        ),
       ),
   );
 }
 
 // Background removal runs entirely on the device, without AI or external APIs.
-export async function cutOutPaper(file: File, onStatus?: (message: string) => void): Promise<ProcessedImage> {
-  if (file.size > MAX_SOURCE_PHOTO_BYTES) throw new Error(`Photo is larger than ${MAX_SOURCE_PHOTO_BYTES / 1024 / 1024} MB`);
+export async function cutOutPaper(
+  file: File,
+  onStatus?: (message: string) => void,
+): Promise<ProcessedImage> {
+  if (file.size > MAX_SOURCE_PHOTO_BYTES)
+    throw new Error(`Photo is larger than ${MAX_SOURCE_PHOTO_BYTES / 1024 / 1024} MB`);
   const bitmap = await decodePhoto(file, onStatus);
   onStatus?.("Removing the background…");
   const blob = canUseWorker() ? await cutOutInWorker(bitmap) : await cutOutOnMainThread(bitmap);

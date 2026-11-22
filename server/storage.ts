@@ -12,7 +12,8 @@ export function openStorage(directory: string) {
   const db = new DatabaseSync(resolve(root, "patterndrop.sqlite"));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
-    const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+    const version = (db.prepare("PRAGMA user_version").get() as { user_version: number })
+      .user_version;
     db.exec("BEGIN IMMEDIATE");
     try {
       for (const [index, migration] of MIGRATIONS.entries()) {
@@ -21,8 +22,14 @@ export function openStorage(directory: string) {
         db.exec(`PRAGMA user_version = ${index + 1}`);
       }
       db.exec("COMMIT");
-    } catch (error) { db.exec("ROLLBACK"); throw error; }
-  } catch (error) { db.close(); throw error; }
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 
   function sessionDirectory(sessionId: string) {
     if (!/^[a-f0-9]{16}$/.test(sessionId)) throw new Error("Invalid session id");
@@ -30,7 +37,8 @@ export function openStorage(directory: string) {
   }
 
   function imagePath(key: string) {
-    if (!/^transfers\/[a-f0-9]{16}\/[a-f0-9]{16}\.png$/.test(key)) throw new Error("Invalid image key");
+    if (!/^transfers\/[a-f0-9]{16}\/[a-f0-9]{16}\.png$/.test(key))
+      throw new Error("Invalid image key");
     return resolve(root, "images", key);
   }
 
@@ -42,19 +50,24 @@ export function openStorage(directory: string) {
     },
     /** Creates the session, or marks an existing one as just used. */
     createSession(sessionId: string) {
-      db.prepare(`INSERT INTO sessions (id, last_seen_at) VALUES (?, CURRENT_TIMESTAMP)
-        ON CONFLICT(id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP`).run(sessionId);
+      db.prepare(
+        `INSERT INTO sessions (id, last_seen_at) VALUES (?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET last_seen_at = CURRENT_TIMESTAMP`,
+      ).run(sessionId);
     },
     /** Marks a session as used. Coarse (hourly) so frequent polling does not write every time. */
     touchSession(sessionId: string) {
-      db.prepare(`UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour'))`).run(sessionId);
+      db.prepare(
+        `UPDATE sessions SET last_seen_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 hour'))`,
+      ).run(sessionId);
     },
     /** Sessions not used for `days` days. */
     expiredSessions(days: number) {
-      const rows = db.prepare("SELECT id FROM sessions WHERE last_seen_at < datetime('now', ?)")
+      const rows = db
+        .prepare("SELECT id FROM sessions WHERE last_seen_at < datetime('now', ?)")
         .all(`-${days} days`) as { id: string }[];
-      return rows.map(row => row.id);
+      return rows.map((row) => row.id);
     },
     /** Deletes a session, its image rows and every file stored for it. */
     async removeSession(sessionId: string) {
@@ -64,39 +77,67 @@ export function openStorage(directory: string) {
         db.prepare("DELETE FROM session_images WHERE session_id = ?").run(sessionId);
         db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
         db.exec("COMMIT");
-      } catch (error) { db.exec("ROLLBACK"); throw error; }
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
       // Rows go first: once they are gone the files are unreachable, so a failure here only leaves garbage.
       await rm(directory, { recursive: true, force: true });
     },
     image(sessionId: string, imageId: string) {
-      return db.prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?").get(imageId, sessionId) as ImageRow | undefined;
+      return db
+        .prepare("SELECT * FROM session_images WHERE id = ? AND session_id = ?")
+        .get(imageId, sessionId) as ImageRow | undefined;
     },
     images(sessionId: string) {
-      return db.prepare("SELECT * FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC").all(sessionId) as ImageRow[];
+      return db
+        .prepare(
+          "SELECT * FROM session_images WHERE session_id = ? ORDER BY created_at DESC, id DESC",
+        )
+        .all(sessionId) as ImageRow[];
     },
     imageCount(sessionId: string) {
-      return (db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?").get(sessionId) as { count: number }).count;
+      return (
+        db
+          .prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
+          .get(sessionId) as { count: number }
+      ).count;
     },
     /** Inserts the image unless the session already holds `limit` images; returns whether it did. */
     insertImage(image: Omit<ImageRow, "created_at">, limit = Infinity) {
       // Count and insert in one write transaction so concurrent uploads cannot both pass the check.
       db.exec("BEGIN IMMEDIATE");
       try {
-        const { count } = db.prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
+        const { count } = db
+          .prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
           .get(image.session_id) as { count: number };
-        if (count >= limit) { db.exec("ROLLBACK"); return false; }
-        db.prepare("INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)")
-          .run(image.id, image.session_id, image.object_key, image.width, image.height);
+        if (count >= limit) {
+          db.exec("ROLLBACK");
+          return false;
+        }
+        db.prepare(
+          "INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)",
+        ).run(image.id, image.session_id, image.object_key, image.width, image.height);
         db.exec("COMMIT");
         return true;
-      } catch (error) { db.exec("ROLLBACK"); throw error; }
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
     },
     deleteImageRow(sessionId: string, imageId: string) {
-      db.prepare("DELETE FROM session_images WHERE id = ? AND session_id = ?").run(imageId, sessionId);
+      db.prepare("DELETE FROM session_images WHERE id = ? AND session_id = ?").run(
+        imageId,
+        sessionId,
+      );
     },
     async readImage(key: string) {
-      try { return new Uint8Array(await readFile(imagePath(key))); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+      try {
+        return new Uint8Array(await readFile(imagePath(key)));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      }
     },
     async writeImage(key: string, body: Uint8Array) {
       const path = imagePath(key);
@@ -104,8 +145,11 @@ export function openStorage(directory: string) {
       await writeFile(path, body, { flag: "wx" });
     },
     async deleteImage(key: string) {
-      try { await unlink(imagePath(key)); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      try {
+        await unlink(imagePath(key));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
     },
   };
 }
