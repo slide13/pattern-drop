@@ -15,7 +15,7 @@ export default function AvatarBoard({
 }: {
   avatar: Avatar;
   equipped: Equipment;
-  selectedSlot: SlotKey;
+  selectedSlot: SlotKey | null;
   drawingSrc: (drawingId: string) => string;
   onSelect: (slot: SlotKey) => void;
   actions: WardrobeActions;

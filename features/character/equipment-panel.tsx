@@ -16,7 +16,7 @@ export default function EquipmentPanel({
   actions,
 }: {
   equipped: Equipment;
-  selectedSlot: SlotKey;
+  selectedSlot: SlotKey | null;
   heldDrawingId: string | null;
   drawingSrc: (drawingId: string) => string;
   onSelect: (slot: SlotKey) => void;
@@ -64,9 +64,13 @@ export default function EquipmentPanel({
       </div>
       <ItemControls
         label={EQUIPMENT_SLOTS.find((slot) => slot.key === selectedSlot)?.label}
-        item={equipped[selectedSlot]}
-        onChange={(patch) => actions.update(selectedSlot, patch)}
-        onUnequip={() => actions.unequip(selectedSlot)}
+        item={selectedSlot ? equipped[selectedSlot] : undefined}
+        onChange={(patch) => {
+          if (selectedSlot) actions.update(selectedSlot, patch);
+        }}
+        onUnequip={() => {
+          if (selectedSlot) actions.unequip(selectedSlot);
+        }}
       />
     </aside>
   );

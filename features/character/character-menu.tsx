@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePersistentState } from "../../lib/hooks/use-persistent-state";
 import type { Drawing } from "../../shared/types";
 import { drawingUrl } from "../session/api";
@@ -26,9 +26,21 @@ export default function CharacterMenu({
     isAvatar,
   );
   const { equipped, ...actions } = useWardrobe(sessionId, drawings);
-  const [selectedSlot, setSelectedSlot] = useState<SlotKey>("torso");
+  const [selectedSlot, setSelectedSlot] = useState<SlotKey | null>(null);
   const [heldDrawingId, setHeldDrawingId] = useState<string | null>(null);
   const drawingSrc = (drawingId: string) => drawingUrl(sessionId, drawingId);
+
+  useEffect(() => {
+    function clearOutsideSelection(event: PointerEvent) {
+      const target = event.target;
+      if (event.button !== 0 || !event.isPrimary || !(target instanceof Element)) return;
+      if (!target.closest(".worn-item, .item-controls, .equipment-slot")) setSelectedSlot(null);
+      // Keep the inventory choice until the tapped equipment slot receives its click.
+      if (!target.closest("button.game-item, .equipment-slot")) setHeldDrawingId(null);
+    }
+    document.addEventListener("pointerdown", clearOutsideSelection, true);
+    return () => document.removeEventListener("pointerdown", clearOutsideSelection, true);
+  }, []);
 
   function equip(slot: SlotKey, drawingId: string) {
     actions.equip(slot, drawingId);
