@@ -335,17 +335,6 @@
 .rotation-control {
   margin-top: 15px;
 }
-.rotation-control > span {
-  display: block;
-  margin-bottom: 7px;
-  font: 700 9px var(--font-mono);
-}
-.rotation-control > div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.rotation-control button,
 .remove-item {
   min-height: 38px;
   border: 1px solid var(--ink);
@@ -353,7 +342,6 @@
   cursor: pointer;
   font: 700 9px var(--font-mono);
 }
-.rotation-control button:disabled,
 .remove-item:disabled {
   cursor: not-allowed;
 }
@@ -409,32 +397,6 @@
 }
 .worn-item img {
   pointer-events: none;
-}
-.rotation-control .control-value {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 7px;
-  font: 700 9px var(--font-mono);
-}
-.rotation-control .rotation-slider {
-  display: block;
-  width: 100%;
-  margin: 0 0 9px;
-  accent-color: var(--ink);
-}
-.rotation-control .degree-buttons {
-  display: grid;
-  grid-template-columns: 1fr 66px 1fr;
-  gap: 6px;
-}
-.degree-buttons input {
-  width: 100%;
-  min-width: 0;
-  text-align: center;
-  border: 1px solid var(--ink);
-  background: var(--paper);
-  font: 700 10px var(--font-mono);
 }
 .center-item {
   width: 100%;
