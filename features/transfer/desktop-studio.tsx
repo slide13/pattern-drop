@@ -24,7 +24,7 @@ export default function DesktopStudio({
   sessionId: string;
   onRestart: () => void;
 }) {
-  const drawings = useSessionDrawings(sessionId);
+  const { ready, drawings } = useSessionDrawings(sessionId);
   const [selectedDrawing, setSelectedDrawing] = useState<Drawing | null>(null);
   const [activeView, setActiveView] = useState<StudioView>("transfer");
   const closeLightbox = useCallback(() => setSelectedDrawing(null), []);
@@ -89,7 +89,9 @@ export default function DesktopStudio({
           </div>
         </div>
         <div className="transfer-panel">
-          {drawings.length ? (
+          {!ready ? (
+            <p role="status">Connecting to the session…</p>
+          ) : drawings.length ? (
             <DrawingInventory
               drawings={drawings}
               drawingUrl={drawingSrc}

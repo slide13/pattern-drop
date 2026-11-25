@@ -37,7 +37,10 @@ export function useSessionDrawings(sessionId: string) {
           if (!registered) return "continue";
         }
         const result = await fetchDrawings(sessionId, signal);
-        if (result.status === "missing") registered = false;
+        if (result.status === "missing") {
+          registered = false;
+          if (!signal.aborted) setState(null);
+        }
         if (result.status === "ok" && !signal.aborted) {
           const drawings = result.data;
           // Keep the previous array when nothing changed so the inventory does not re-render.
@@ -53,5 +56,6 @@ export function useSessionDrawings(sessionId: string) {
     { intervalMs: SESSION_POLL_INTERVAL_MS, pauseWhileHidden: true },
   );
 
-  return state?.sessionId === sessionId ? state.drawings : NO_DRAWINGS;
+  const ready = state?.sessionId === sessionId;
+  return { ready, drawings: ready ? state.drawings : NO_DRAWINGS };
 }
