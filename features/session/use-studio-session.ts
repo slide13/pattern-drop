@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { SESSION_ID_PATTERN } from "../../shared/constants";
 
-// crypto.randomUUID exists only in secure contexts, but the desktop page is often
-// opened over plain HTTP on a LAN address.
-function makeSessionId() {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+import { randomId } from "../../lib/random-id";
 
 /** Reads the session id and mode from the URL, creating a session when there is none. */
 export function useStudioSession() {
@@ -18,7 +13,7 @@ export function useStudioSession() {
       const params = new URLSearchParams(window.location.search);
       const candidate = params.get("session");
       const existing = candidate && SESSION_ID_PATTERN.test(candidate) ? candidate : null;
-      const id = existing || makeSessionId();
+      const id = existing || randomId();
       setSessionId(id);
       setIsCamera(params.get("mode") === "camera");
       if (!existing) {
@@ -30,7 +25,7 @@ export function useStudioSession() {
   }, []);
 
   const restart = useCallback(() => {
-    const id = makeSessionId();
+    const id = randomId();
     setSessionId(id);
     window.history.replaceState({}, "", `?session=${id}`);
   }, []);

@@ -45,6 +45,11 @@ function sessionFull() {
 }
 
 async function uploadImage(request: Request, storage: Storage, sessionId: string) {
+  const uploadKey = request.headers.get("Idempotency-Key");
+  if (uploadKey !== null && !/^[a-f0-9]{16}$/.test(uploadKey))
+    return json({ error: "Invalid upload key" }, 400);
+  const previous = storage.uploadedImageId(sessionId, uploadKey);
+  if (previous) return json({ ok: true, imageId: previous });
   // Checked before reading the body so a full session cannot be used to fill the disk;
   // the insert checks again because other uploads may finish while this body is read.
   if (storage.imageCount(sessionId) >= MAX_IMAGES_PER_SESSION) return sessionFull();
@@ -52,21 +57,19 @@ async function uploadImage(request: Request, storage: Storage, sessionId: string
   const imageId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
   const objectKey = `transfers/${sessionId}/${imageId}.png`;
   await storage.writeImage(objectKey, body);
-  let inserted: boolean;
+  let storedId: string | null;
   try {
-    inserted = storage.insertImage(
+    storedId = storage.insertImage(
       { id: imageId, session_id: sessionId, object_key: objectKey, width, height },
       MAX_IMAGES_PER_SESSION,
+      uploadKey,
     );
   } catch (error) {
     await storage.deleteImage(objectKey);
     throw error;
   }
-  if (!inserted) {
-    await storage.deleteImage(objectKey);
-    return sessionFull();
-  }
-  return json({ ok: true, imageId });
+  if (storedId !== imageId) await storage.deleteImage(objectKey);
+  return storedId ? json({ ok: true, imageId: storedId }) : sessionFull();
 }
 
 async function handleSession(

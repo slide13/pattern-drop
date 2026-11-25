@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { randomId } from "../../lib/random-id";
 import { cutOutPaper } from "../image-processing/process-image";
 import type { ProcessedImage } from "../image-processing/process-image";
 import { uploadDrawing } from "../session/api";
@@ -20,7 +21,7 @@ export function usePhotoUpload(
   sessionId: string,
   { enabled, onSessionMissing }: { enabled: boolean; onSessionMissing: () => void },
 ) {
-  const [processed, setProcessed] = useState<ProcessedImage | null>(null);
+  const [processed, setProcessed] = useState<(ProcessedImage & { uploadKey: string }) | null>(null);
   const [status, setStatus] = useState<UploadStatus>({ phase: "idle", message: "" });
 
   useEffect(() => {
@@ -34,7 +35,8 @@ export function usePhotoUpload(
     const progress = (message: string) => setStatus({ phase: "busy", message });
     progress("Removing the background…");
     try {
-      setProcessed(await cutOutPaper(file, progress));
+      const image = await cutOutPaper(file, progress);
+      setProcessed({ ...image, uploadKey: randomId() });
       setStatus({ phase: "done", message: "Ready. Check the result." });
     } catch (error) {
       setStatus({ phase: "error", message: errorMessage(error, "Could not process the photo") });
@@ -44,7 +46,7 @@ export function usePhotoUpload(
   async function sendPhoto() {
     if (!processed || !enabled) return;
     setStatus({ phase: "busy", message: "Sending to the computer…" });
-    const result = await uploadDrawing(sessionId, processed.blob);
+    const result = await uploadDrawing(sessionId, processed.blob, processed.uploadKey);
     if (result.status === "missing") {
       setProcessed(null);
       setStatus({ phase: "idle", message: "" });

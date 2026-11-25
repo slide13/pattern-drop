@@ -42,8 +42,17 @@ export function openStorage(directory: string) {
     return resolve(root, "images", key);
   }
 
+  function uploadedImageId(sessionId: string, key: string | null) {
+    if (key === null) return undefined;
+    const row = db
+      .prepare("SELECT id FROM session_images WHERE session_id = ? AND upload_key = ?")
+      .get(sessionId, key) as { id: string } | undefined;
+    return row?.id;
+  }
+
   return {
     db,
+    uploadedImageId,
     close: () => db.close(),
     sessionExists(sessionId: string) {
       return !!db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(sessionId);
@@ -120,23 +129,28 @@ export function openStorage(directory: string) {
           .get(sessionId) as { count: number }
       ).count;
     },
-    /** Inserts the image unless the session already holds `limit` images; returns whether it did. */
-    insertImage(image: Omit<ImageRow, "created_at">, limit = Infinity) {
+    /** Inserts the image unless the session already holds `limit` images; returns the original ID on replay. */
+    insertImage(image: Omit<ImageRow, "created_at">, limit: number, uploadKey: string | null) {
       // Count and insert in one write transaction so concurrent uploads cannot both pass the check.
       db.exec("BEGIN IMMEDIATE");
       try {
+        const previous = uploadedImageId(image.session_id, uploadKey);
+        if (previous) {
+          db.exec("COMMIT");
+          return previous;
+        }
         const { count } = db
           .prepare("SELECT COUNT(*) AS count FROM session_images WHERE session_id = ?")
           .get(image.session_id) as { count: number };
         if (count >= limit) {
           db.exec("ROLLBACK");
-          return false;
+          return null;
         }
         db.prepare(
-          "INSERT INTO session_images (id, session_id, object_key, width, height) VALUES (?, ?, ?, ?, ?)",
-        ).run(image.id, image.session_id, image.object_key, image.width, image.height);
+          "INSERT INTO session_images (id, session_id, object_key, width, height, upload_key) VALUES (?, ?, ?, ?, ?, ?)",
+        ).run(image.id, image.session_id, image.object_key, image.width, image.height, uploadKey);
         db.exec("COMMIT");
-        return true;
+        return image.id;
       } catch (error) {
         db.exec("ROLLBACK");
         throw error;

@@ -55,12 +55,12 @@ export function fetchDrawings(sessionId: string, signal?: AbortSignal) {
   );
 }
 
-export function uploadDrawing(sessionId: string, png: Blob) {
+export function uploadDrawing(sessionId: string, png: Blob, uploadKey: string) {
   return request(
     () =>
       fetch(sessionUrl(sessionId), {
         method: "PUT",
-        headers: { "content-type": "image/png" },
+        headers: { "content-type": "image/png", "Idempotency-Key": uploadKey },
         body: png,
       }),
     async () => undefined,

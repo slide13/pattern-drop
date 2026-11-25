@@ -33,4 +33,7 @@ export const MIGRATIONS = [
     created_at
   );
   CREATE INDEX idx_sessions_last_seen ON sessions(last_seen_at)`,
+  `ALTER TABLE session_images ADD COLUMN upload_key TEXT;
+  CREATE UNIQUE INDEX idx_image_upload_key ON session_images(session_id, upload_key)
+    WHERE upload_key IS NOT NULL`,
 ] as const;

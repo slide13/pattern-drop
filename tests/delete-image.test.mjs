@@ -57,11 +57,11 @@ function fixture(t) {
       ),
       storage,
     );
-  const upload = async (session = sessionId) => {
+  const upload = async (session = sessionId, headers = {}) => {
     const response = await handleSessionRequest(
       new Request(`http://localhost/api/sessions/${session}`, {
         method: "PUT",
-        headers: { "content-type": "image/png" },
+        headers: { "content-type": "image/png", ...headers },
         body: png(),
       }),
       storage,
@@ -318,4 +318,15 @@ test("images are served with nosniff so the browser never reinterprets them", as
   const image = await f.upload();
   const response = await f.request("GET", sessionId, image);
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+});
+
+test("a retried upload keeps one drawing and one file, including simultaneous attempts", async (t) => {
+  const f = fixture(t);
+  const key = { "Idempotency-Key": "abcdef1234567890" };
+  const ids = await Promise.all([f.upload(sessionId, key), f.upload(sessionId, key)]);
+  assert.equal(ids[0], ids[1]);
+  assert.equal(await f.upload(sessionId, key), ids[0]);
+  assert.equal(f.storage.imageCount(sessionId), 1);
+  assert.equal(f.objects.size, 1);
+  assert.notEqual(await f.upload(otherSessionId, key), ids[0]);
 });
