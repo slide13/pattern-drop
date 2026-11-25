@@ -12,14 +12,14 @@ export type WarpPoint = Drag & {
   id: string;
   x: number;
   y: number;
-  // Preserve the existing shape when a new neighbour narrows later edits.
+  // Preserve the existing shape when the radius changes for later edits.
   previousDrags?: Drag[];
 };
 export type WarpField = (x: number, y: number) => Vec;
 
 /** Reach of a new point, in local pixels. Use the shorter side so narrow items bend locally. */
 export function warpRadius(width: number, height: number) {
-  return 0.2 * Math.min(width, height);
+  return 0.23 * Math.min(width, height);
 }
 /** Closest two points may be, in pixels, so each stays easy to grab. */
 const MIN_POINT_GAP = 8;
@@ -92,11 +92,11 @@ export function moveWarpPoint(
   points: readonly WarpPoint[],
   id: string,
   target: Vec,
-  maxRadius = Infinity,
+  maxRadius?: number,
 ) {
   return points.map((point) => {
     if (point.id !== id) return point;
-    let radius = Math.min(point.radius, maxRadius);
+    let radius = maxRadius ?? point.radius;
     for (const other of points) {
       if (other !== point)
         radius = Math.min(radius, Math.hypot(point.x - other.x, point.y - other.y));
