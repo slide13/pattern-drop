@@ -71,3 +71,21 @@ npm test               # build, then all tests (what CI runs, with format:check,
 ```
 
 CI runs on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
+
+## Screenshots
+
+**Connect the phone.** The computer shows a QR code that opens the session on the phone.
+
+![QR code linking the phone to the session](screenshots/04.png)
+
+**Session inventory.** Photographed drawings appear on the computer with the paper background removed.
+
+![Session inventory with a transferred drawing of jeans](screenshots/01.png)
+
+**Character.** Drag drawings into equipment slots to dress the model, then scale and rotate them.
+
+![Character screen with the jeans equipped on the girl model](screenshots/02.png)
+
+**Shape points.** Add points to an equipped item and drag them to bend the drawing to the body.
+
+<img src="screenshots/03.png" alt="Shape points on equipped jeans" width="400">
