@@ -25,13 +25,11 @@ async function deleteImage(storage: Storage, sessionId: string, imageId: string)
   const row = storage.image(sessionId, imageId);
   if (!row) return json({ error: "Image not found" }, 404);
   const body = await storage.readImage(row.object_key);
-  if (!body) return json({ error: "Image not found" }, 404);
-
-  await storage.deleteImage(row.object_key);
+  if (body) await storage.deleteImage(row.object_key);
   try {
     storage.deleteImageRow(sessionId, imageId);
   } catch (error) {
-    await storage.writeImage(row.object_key, body);
+    if (body) await storage.writeImage(row.object_key, body);
     throw error;
   }
   return json({ ok: true });

@@ -331,3 +331,13 @@ test("a retried upload keeps one drawing and one file, including simultaneous at
   assert.equal(f.objects.size, 1);
   assert.notEqual(await f.upload(otherSessionId, key), ids[0]);
 });
+
+test("deleting a drawing whose file is already gone frees its inventory slot", async (t) => {
+  const f = fixture(t);
+  const id = await f.upload();
+  await f.storage.deleteImage(f.storage.image(sessionId, id).object_key);
+  assert.equal((await f.request("DELETE", sessionId, id)).status, 200);
+  assert.deepEqual(await (await f.request("GET")).json(), { drawings: [] });
+  assert.equal(f.storage.imageCount(sessionId), 0);
+  assert.equal((await f.request("DELETE", sessionId, id)).status, 404);
+});
