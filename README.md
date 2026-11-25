@@ -1,6 +1,6 @@
 # PatternDrop
 
-An app for transferring clothing drawings from paper to your computer’s browser.
+An app for transferring clothing drawings from paper to your computer’s browser. I built this app for my daughter. She loves drawing and dressing up dolls in different outfits. Now she can dress up characters in clothes she draws herself.
 
 ## How it works
 
@@ -72,7 +72,7 @@ npm test               # build, then all tests (what CI runs, with format:check,
 
 CI runs on every push to `main` and on pull requests (`.github/workflows/ci.yml`).
 
-## Screenshots
+## What does it look like
 
 **Connect the phone.** The computer shows a QR code that opens the session on the phone.
 
