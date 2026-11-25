@@ -69,9 +69,15 @@ export function addItemWarpPoint(
   });
 }
 
-export function moveItemWarpPoint(state: Wardrobe, slot: SlotKey, pointId: string, target: Vec) {
+export function moveItemWarpPoint(
+  state: Wardrobe,
+  slot: SlotKey,
+  pointId: string,
+  target: Vec,
+  maxRadius?: number,
+) {
   return updateItem(state, slot, (item) => ({
-    warp: moveWarpPoint(item.warp ?? [], pointId, target),
+    warp: moveWarpPoint(item.warp ?? [], pointId, target, maxRadius),
   }));
 }
 
@@ -94,14 +100,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const isNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value);
+const isNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
 
 function isWarpPoint(value: unknown): value is WarpPoint {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
     ["x", "y", "dx", "dy", "radius"].every((key) => isNumber(value[key])) &&
-    (value.radius as number) > 0
+    (value.radius as number) > 0 &&
+    (value.previousDrags === undefined ||
+      (Array.isArray(value.previousDrags) &&
+        value.previousDrags.every(
+          (drag) =>
+            isRecord(drag) &&
+            isNumber(drag.dx) &&
+            isNumber(drag.dy) &&
+            isNumber(drag.radius) &&
+            drag.radius > 0,
+        )))
   );
 }
 

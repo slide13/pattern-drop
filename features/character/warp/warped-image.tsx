@@ -24,6 +24,18 @@ function grow(triangle: [Vec, Vec, Vec]): [Vec, Vec, Vec] {
   }) as [Vec, Vec, Vec];
 }
 
+// Include the pins as mesh vertices so interpolation cannot pull a stationary pin.
+function meshAxis(start: number, size: number, pins: number[]) {
+  const offsets = new Set(Array.from({ length: GRID + 1 }, (_, i) => start + (size * i) / GRID));
+  for (const pin of pins) {
+    if (pin > start && pin < start + size) offsets.add(pin);
+  }
+  // Inverting an existing warp can put a pin a rounding error away from a grid line.
+  return [...offsets]
+    .sort((a, b) => a - b)
+    .filter((value, i, sorted) => i === 0 || value - sorted[i - 1] > 1e-6);
+}
+
 /** Draws the warped image; returns false when it cannot be drawn yet. */
 function drawWarped(canvas: HTMLCanvasElement, image: HTMLImageElement, points: WarpPoint[]) {
   const width = image.offsetWidth;
@@ -47,13 +59,23 @@ function drawWarped(canvas: HTMLCanvasElement, image: HTMLImageElement, points: 
   const top = (height - fitHeight) / 2;
 
   const field = createWarpField(points);
+  const xs = meshAxis(
+    left,
+    fitWidth,
+    points.map((point) => point.x),
+  );
+  const ys = meshAxis(
+    top,
+    fitHeight,
+    points.map((point) => point.y),
+  );
   const source: Vec[][] = [];
   const target: Vec[][] = [];
-  for (let row = 0; row <= GRID; row++) {
+  for (let row = 0; row < ys.length; row++) {
     source.push([]);
     target.push([]);
-    for (let col = 0; col <= GRID; col++) {
-      const p = { x: left + (fitWidth * col) / GRID, y: top + (fitHeight * row) / GRID };
+    for (let col = 0; col < xs.length; col++) {
+      const p = { x: xs[col], y: ys[row] };
       const offset = field(p.x, p.y);
       source[row].push(p);
       target[row].push({ x: p.x + offset.x, y: p.y + offset.y });
@@ -61,17 +83,15 @@ function drawWarped(canvas: HTMLCanvasElement, image: HTMLImageElement, points: 
   }
 
   const base = [ratio, 0, 0, ratio, padX * ratio, padY * ratio] as const;
-  const cellWidth = naturalWidth / GRID;
-  const cellHeight = naturalHeight / GRID;
   const margin = 2 / fit; // Source pixels beyond the cell that the grown triangles may show.
   context.clearRect(0, 0, canvas.width, canvas.height);
-  for (let row = 0; row < GRID; row++) {
-    for (let col = 0; col < GRID; col++) {
+  for (let row = 0; row < ys.length - 1; row++) {
+    for (let col = 0; col < xs.length - 1; col++) {
       // Only the cell's own part of the image is sampled, which keeps every draw small.
-      const sx = Math.max(0, col * cellWidth - margin);
-      const sy = Math.max(0, row * cellHeight - margin);
-      const sw = Math.min(naturalWidth, (col + 1) * cellWidth + margin) - sx;
-      const sh = Math.min(naturalHeight, (row + 1) * cellHeight + margin) - sy;
+      const sx = Math.max(0, (xs[col] - left) / fit - margin);
+      const sy = Math.max(0, (ys[row] - top) / fit - margin);
+      const sw = Math.min(naturalWidth, (xs[col + 1] - left) / fit + margin) - sx;
+      const sh = Math.min(naturalHeight, (ys[row + 1] - top) / fit + margin) - sy;
       const corners = [
         [source[row][col], source[row][col + 1], source[row + 1][col]],
         [source[row][col + 1], source[row + 1][col + 1], source[row + 1][col]],

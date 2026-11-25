@@ -7,6 +7,7 @@ import {
   moveWarpPoint,
   triangleTransform,
   warpPointPosition,
+  warpRadius,
 } from "../features/character/warp/warp.ts";
 
 const radius = 80;
@@ -95,4 +96,29 @@ test("triangle transform maps each source corner onto its destination", () => {
     close(a * p.x + c * p.y + e, to[i].x, 1e-9);
     close(b * p.x + d * p.y + f, to[i].y, 1e-9);
   });
+});
+
+test("a drag on the 170 × 300 leg slot stays local and leaves an overlapping pin fixed", () => {
+  const reach = warpRadius(170, 300);
+  let points = addWarpPoint([], { x: 60, y: 100 }, reach, "hem");
+  points = addWarpPoint(points, { x: 80, y: 100 }, reach, "seam");
+  points = moveWarpPoint(points, "hem", { x: 70, y: 100 });
+  const field = createWarpField(points);
+  close(field(60, 100).x, 10);
+  assert.ok(field(65, 100).x > 0);
+  close(field(80, 100).x, 0);
+  close(field(110, 100).x, 0);
+  assert.deepEqual(warpPointPosition(points, points[1]), { x: 80, y: 100 });
+});
+
+test("a local edit to a saved wide warp preserves the rest of the existing fit", () => {
+  const old = [{ id: "hem", x: 60, y: 100, dx: 10, dy: -2, radius: 105 }];
+  const points = addWarpPoint(old, { x: 85, y: 100 }, 34, "seam");
+  const pinned = warpPointPosition(points, points[1]);
+  const before = createWarpField(points);
+  const edited = moveWarpPoint(points, "hem", { x: 75, y: 99 }, 34);
+  const field = createWarpField(JSON.parse(JSON.stringify(edited)));
+  assert.deepEqual(field(110, 100), before(110, 100));
+  assert.deepEqual(warpPointPosition(edited, edited[1]), pinned);
+  assert.deepEqual(warpPointPosition(edited, edited[0]), { x: 75, y: 99 });
 });

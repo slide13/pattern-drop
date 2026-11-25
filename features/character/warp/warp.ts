@@ -7,53 +7,57 @@
 
 export type Vec = { x: number; y: number };
 /** A control point: the image pixel it is pinned to, its own drag, and its reach. */
-export type WarpPoint = {
+type Drag = { dx: number; dy: number; radius: number };
+export type WarpPoint = Drag & {
   id: string;
   x: number;
   y: number;
-  dx: number;
-  dy: number;
-  radius: number;
+  // Preserve the existing shape when a new neighbour narrows later edits.
+  previousDrags?: Drag[];
 };
 export type WarpField = (x: number, y: number) => Vec;
 
-/** Reach of a new point, as a fraction of the item's larger side; nothing beyond it moves. */
-export const WARP_RADIUS = 0.35;
+/** Reach of a new point, in local pixels. Use the shorter side so narrow items bend locally. */
+export function warpRadius(width: number, height: number) {
+  return 0.2 * Math.min(width, height);
+}
 /** Closest two points may be, in pixels, so each stays easy to grab. */
 const MIN_POINT_GAP = 8;
 
 export function hasDisplacement(points: readonly WarpPoint[] | undefined) {
-  return !!points?.some((point) => point.dx !== 0 || point.dy !== 0);
+  return !!points?.some(
+    (point) => point.dx !== 0 || point.dy !== 0 || !!point.previousDrags?.length,
+  );
 }
 
 /** Smooth falloff: 1 at the point, 0 (with zero slope) at its radius. */
-function influence(point: WarpPoint, x: number, y: number) {
-  const ratio = ((point.x - x) ** 2 + (point.y - y) ** 2) / point.radius ** 2;
+function influence(distanceSquared: number, radius: number) {
+  const ratio = distanceSquared / (radius * radius);
   return ratio < 1 ? (1 - ratio) ** 2 : 0;
 }
 
-/** Sum of the drags of `points` at (x, y), skipping the point with id `except`. */
-function displacement(points: readonly WarpPoint[], x: number, y: number, except?: string): Vec {
-  let dx = 0;
-  let dy = 0;
-  for (const point of points) {
-    if (point.id === except || (point.dx === 0 && point.dy === 0)) continue;
-    const weight = influence(point, x, y);
-    dx += weight * point.dx;
-    dy += weight * point.dy;
-  }
-  return { x: dx, y: dy };
-}
-
-/** The displacement field: how far the image pixel at (x, y) is moved. */
+/** Each drag keeps the support radius it had when it was applied. */
 export function createWarpField(points: readonly WarpPoint[]): WarpField {
-  const moved = points.filter((point) => point.dx !== 0 || point.dy !== 0);
-  return (x, y) => displacement(moved, x, y);
+  const drags = points.flatMap((point) =>
+    [point, ...(point.previousDrags ?? [])]
+      .filter((drag) => drag.dx !== 0 || drag.dy !== 0)
+      .map(({ dx, dy, radius }) => ({ x: point.x, y: point.y, dx, dy, radius })),
+  );
+  return (x, y) => {
+    let dx = 0;
+    let dy = 0;
+    for (const drag of drags) {
+      const weight = influence((drag.x - x) ** 2 + (drag.y - y) ** 2, drag.radius);
+      dx += weight * drag.dx;
+      dy += weight * drag.dy;
+    }
+    return { x: dx, y: dy };
+  };
 }
 
 /** Where a point's pixel is currently shown. */
 export function warpPointPosition(points: readonly WarpPoint[], point: WarpPoint): Vec {
-  const offset = displacement(points, point.x, point.y);
+  const offset = createWarpField(points)(point.x, point.y);
   return { x: point.x + offset.x, y: point.y + offset.y };
 }
 
@@ -84,12 +88,28 @@ export function addWarpPoint(
 }
 
 /** Drags one point so its pixel is shown exactly at `target`. */
-export function moveWarpPoint(points: readonly WarpPoint[], id: string, target: Vec) {
+export function moveWarpPoint(
+  points: readonly WarpPoint[],
+  id: string,
+  target: Vec,
+  maxRadius = Infinity,
+) {
   return points.map((point) => {
     if (point.id !== id) return point;
-    // The point's own influence is 1 at its pixel, so its drag is what the others leave over.
-    const others = displacement(points, point.x, point.y, id);
-    return { ...point, dx: target.x - point.x - others.x, dy: target.y - point.y - others.y };
+    let radius = Math.min(point.radius, maxRadius);
+    for (const other of points) {
+      if (other !== point)
+        radius = Math.min(radius, Math.hypot(point.x - other.x, point.y - other.y));
+    }
+    if (radius <= 0) return point;
+    const shown = warpPointPosition(points, point);
+    const dx = target.x - shown.x;
+    const dy = target.y - shown.y;
+    if (dx === 0 && dy === 0) return point;
+    if (radius === point.radius) return { ...point, dx: point.dx + dx, dy: point.dy + dy };
+    if (point.dx === 0 && point.dy === 0) return { ...point, radius, dx, dy };
+    const previous = { dx: point.dx, dy: point.dy, radius: point.radius };
+    return { ...point, radius, dx, dy, previousDrags: [...(point.previousDrags ?? []), previous] };
   });
 }
 

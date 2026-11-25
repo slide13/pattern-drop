@@ -1,7 +1,7 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { pointerInItem } from "./item-geometry";
 import type { EquippedItem } from "./wardrobe.types";
-import { WARP_RADIUS, warpPointPosition, type Vec, type WarpPoint } from "./warp/warp";
+import { warpRadius, warpPointPosition, type Vec, type WarpPoint } from "./warp/warp";
 
 /** Pointer travel, in pixels, below which a press on an item counts as a click. */
 const CLICK_SLOP = 4;
@@ -55,7 +55,7 @@ export function useItemDrag({
     release(event);
     const box = itemBox(event);
     if (event.type !== "pointerup" || current.moved || !current.wasSelected || !box) return;
-    const radius = WARP_RADIUS * Math.max(box.offsetWidth, box.offsetHeight);
+    const radius = warpRadius(box.offsetWidth, box.offsetHeight);
     onAddPoint(pointerInItem(box, item, event.clientX, event.clientY), radius);
   };
 
@@ -94,7 +94,7 @@ export function usePointDrag({
   onMovePoint,
 }: {
   item: EquippedItem;
-  onMovePoint: (pointId: string, target: Vec) => void;
+  onMovePoint: (pointId: string, target: Vec, maxRadius: number) => void;
 }) {
   // `grab` keeps the handle from jumping when it is pressed off-center.
   const drag = useRef<{ pointId: string; pointerId: number; grab: Vec } | null>(null);
@@ -120,10 +120,14 @@ export function usePointDrag({
       const box = itemBox(event);
       if (!current || current.pointerId !== event.pointerId || !box) return;
       const pointer = pointerInItem(box, item, event.clientX, event.clientY);
-      onMovePoint(current.pointId, {
-        x: pointer.x - current.grab.x,
-        y: pointer.y - current.grab.y,
-      });
+      onMovePoint(
+        current.pointId,
+        {
+          x: pointer.x - current.grab.x,
+          y: pointer.y - current.grab.y,
+        },
+        warpRadius(box.offsetWidth, box.offsetHeight),
+      );
     },
     onPointerUp: finish,
     onPointerCancel: finish,

@@ -50,8 +50,8 @@ export function useWardrobe(sessionId: string, drawings: Drawing[]) {
       setWardrobe((state) => updateItem(state, slot, () => patch)),
     addPoint: (slot: SlotKey, target: Vec, radius: number) =>
       setWardrobe((state) => addItemWarpPoint(state, slot, target, radius, newPointId())),
-    movePoint: (slot: SlotKey, pointId: string, target: Vec) =>
-      setWardrobe((state) => moveItemWarpPoint(state, slot, pointId, target)),
+    movePoint: (slot: SlotKey, pointId: string, target: Vec, maxRadius: number) =>
+      setWardrobe((state) => moveItemWarpPoint(state, slot, pointId, target, maxRadius)),
     removePoint: (slot: SlotKey, pointId: string) =>
       setWardrobe((state) => removeItemWarpPoint(state, slot, pointId)),
   };

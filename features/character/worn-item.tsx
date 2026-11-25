@@ -25,7 +25,7 @@ export default function WornItem({
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onAddPoint: (target: Vec, radius: number) => void;
-  onMovePoint: (pointId: string, target: Vec) => void;
+  onMovePoint: (pointId: string, target: Vec, maxRadius: number) => void;
   onRemovePoint: (pointId: string) => void;
 }) {
   const itemDrag = useItemDrag({ item, selected, onSelect, onMove, onAddPoint });

@@ -42,7 +42,9 @@ export default function AvatarBoard({
               onSelect={() => onSelect(key)}
               onMove={(x, y) => actions.update(key, { x, y })}
               onAddPoint={(target, radius) => actions.addPoint(key, target, radius)}
-              onMovePoint={(pointId, target) => actions.movePoint(key, pointId, target)}
+              onMovePoint={(pointId, target, radius) =>
+                actions.movePoint(key, pointId, target, radius)
+              }
               onRemovePoint={(pointId) => actions.removePoint(key, pointId)}
             />
           );
