@@ -1,3 +1,4 @@
+import { png } from "./png-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
@@ -11,15 +12,6 @@ import { handleSessionRequest } from "../server/sessions.ts";
 const sessionId = "1111111111111111";
 const otherSessionId = "2222222222222222";
 const unknownSessionId = "3333333333333333";
-
-function png(width = 10, height = 20) {
-  const bytes = new Uint8Array(24);
-  bytes.set([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(16, width);
-  view.setUint32(20, height);
-  return bytes;
-}
 
 // Exercise real SQLite and files in an isolated temporary directory.
 function fixture(t) {
@@ -156,10 +148,19 @@ test("rejects oversized streams before storing anything", async (t) => {
 
 test("validates PNG bytes and reads dimensions from IHDR", async (t) => {
   const f = fixture(t);
+  const oversized = png();
+  new DataView(oversized.buffer).setUint32(16, 10001);
+  const zeroHeight = png();
+  new DataView(zeroHeight.buffer).setUint32(20, 0);
+  const damaged = png();
+  damaged[45] ^= 1;
   for (const [body, contentType, status] of [
     [new Uint8Array([137, 80, 78, 71]), "image/png", 400],
-    [png(10001, 20), "image/png", 400],
-    [png(10, 0), "image/png", 400],
+    [oversized, "image/png", 400],
+    [zeroHeight, "image/png", 400],
+    [png().slice(0, 24), "image/png", 400],
+    [png().slice(0, -12), "image/png", 400],
+    [damaged, "image/png", 400],
     [png(), "image/jpeg", 415],
   ]) {
     const response = await handleSessionRequest(

@@ -1,7 +1,7 @@
+import { crc32 } from "node:zlib";
 import { MAX_IMAGE_DIMENSION, MAX_UPLOAD_BYTES } from "../shared/constants.ts";
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-const IHDR = new Uint8Array([73, 72, 68, 82]);
 
 export class UploadError extends Error {
   readonly status: number;
@@ -14,6 +14,44 @@ export class UploadError extends Error {
 
 function matches(bytes: Uint8Array, expected: Uint8Array, offset: number) {
   return expected.every((value, index) => bytes[offset + index] === value);
+}
+
+/** Check chunk boundaries and checksums without expanding the pixel buffer. */
+function readPngDimensions(body: Uint8Array) {
+  const bytes = Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+  const invalid = () => new UploadError("Invalid PNG image", 400);
+  if (
+    !matches(bytes, PNG_SIGNATURE, 0) ||
+    bytes.length < 33 ||
+    bytes.readUInt32BE(8) !== 13 ||
+    bytes.toString("latin1", 12, 16) !== "IHDR"
+  )
+    throw invalid();
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (![width, height].every((value) => value >= 1 && value <= MAX_IMAGE_DIMENSION)) {
+    throw new UploadError("Invalid image dimensions", 400);
+  }
+  let hasPixels = false;
+  let offset = PNG_SIGNATURE.length;
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.toString("latin1", offset + 4, offset + 8);
+    const end = offset + 8 + length;
+    if (
+      end + 4 > bytes.length ||
+      crc32(bytes.subarray(offset + 4, end)) !== bytes.readUInt32BE(end)
+    )
+      throw invalid();
+    if (type === "IHDR" && offset !== PNG_SIGNATURE.length) throw invalid();
+    if (type === "IDAT" && length > 0) hasPixels = true;
+    offset = end + 4;
+    if (type === "IEND") {
+      if (length !== 0 || !hasPixels || offset !== bytes.length) throw invalid();
+      return { width, height };
+    }
+  }
+  throw invalid();
 }
 
 export async function readPngUpload(request: Request) {
@@ -53,15 +91,5 @@ export async function readPngUpload(request: Request) {
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  if (body.byteLength < 24 || !matches(body, PNG_SIGNATURE, 0) || !matches(body, IHDR, 12)) {
-    throw new UploadError("Invalid PNG image", 400);
-  }
-
-  const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
-  const width = view.getUint32(16);
-  const height = view.getUint32(20);
-  if (![width, height].every((value) => value >= 1 && value <= MAX_IMAGE_DIMENSION)) {
-    throw new UploadError("Invalid image dimensions", 400);
-  }
-  return { body, width, height };
+  return { body, ...readPngDimensions(body) };
 }
