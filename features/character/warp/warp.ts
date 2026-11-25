@@ -19,7 +19,7 @@ export type WarpField = (x: number, y: number) => Vec;
 
 /** Reach of a new point, in local pixels. Use the shorter side so narrow items bend locally. */
 export function warpRadius(width: number, height: number) {
-  return 0.23 * Math.min(width, height);
+  return 0.299 * Math.min(width, height);
 }
 /** Closest two points may be, in pixels, so each stays easy to grab. */
 const MIN_POINT_GAP = 8;
