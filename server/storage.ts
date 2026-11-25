@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, rmdir, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { MIGRATIONS } from "./migrations.ts";
 import { startSessionCleanup } from "./cleanup.ts";
@@ -70,19 +70,36 @@ export function openStorage(directory: string) {
       return rows.map((row) => row.id);
     },
     /** Deletes a session, its image rows and every file stored for it. */
-    async removeSession(sessionId: string) {
+    async removeExpiredSession(sessionId: string, days: number) {
       const directory = sessionDirectory(sessionId);
+      let images: { object_key: string }[];
       db.exec("BEGIN IMMEDIATE");
       try {
+        const deleted = db
+          .prepare("DELETE FROM sessions WHERE id = ? AND last_seen_at < datetime('now', ?)")
+          .run(sessionId, `-${days} days`);
+        if (!deleted.changes) {
+          db.exec("COMMIT");
+          return false;
+        }
+        images = db
+          .prepare("SELECT object_key FROM session_images WHERE session_id = ?")
+          .all(sessionId) as typeof images;
         db.prepare("DELETE FROM session_images WHERE session_id = ?").run(sessionId);
-        db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
         throw error;
       }
-      // Rows go first: once they are gone the files are unreachable, so a failure here only leaves garbage.
-      await rm(directory, { recursive: true, force: true });
+      // A desktop can register the same ID again while files are being removed.
+      for (const image of images) await rm(imagePath(image.object_key), { force: true });
+      try {
+        await rmdir(directory);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw error;
+      }
+      return true;
     },
     image(sessionId: string, imageId: string) {
       return db

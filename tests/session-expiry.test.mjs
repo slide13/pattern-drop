@@ -116,3 +116,16 @@ test("upgrading dates existing sessions by their latest upload", (t) => {
     storage.close();
   }
 });
+
+test("cleanup rechecks activity after selecting its candidates", async (t) => {
+  const f = fixture(t);
+  await f.call("POST", fresh);
+  await f.call("PUT", fresh, png);
+  f.age(fresh, "-8 days");
+  const candidates = f.storage.expiredSessions(7);
+  await f.call("GET", fresh);
+  assert.deepEqual(candidates, [fresh]);
+  assert.equal(await f.storage.removeExpiredSession(candidates[0], 7), false);
+  assert.equal(f.storage.imageCount(fresh), 1);
+  assert.equal(existsSync(f.folder(fresh)), true);
+});

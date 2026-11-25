@@ -8,8 +8,7 @@ export async function removeExpiredSessions(storage: Storage, days = SESSION_TTL
   let removed = 0;
   for (const sessionId of storage.expiredSessions(days)) {
     try {
-      await storage.removeSession(sessionId);
-      removed++;
+      if (await storage.removeExpiredSession(sessionId, days)) removed++;
     } catch (error) {
       console.error(`Could not remove expired session ${sessionId}:`, error);
     }
